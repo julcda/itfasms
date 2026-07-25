@@ -1,0 +1,61 @@
+# ==========================================================================
+# ITFA I-SMS  ·  .gitignore
+# Keeps secrets, live credentials, real student data, and build artifacts
+# OUT of version control. Review before committing new file types.
+# ==========================================================================
+
+# ---- Secrets & live credentials (NEVER commit) --------------------------
+credentials.txt
+config/online_database.php
+portal/.env
+portal/.env.*
+!portal/.env.example
+.env
+*.pem
+*.key
+
+# ---- Real database dumps / backups (contain student PII) ----------------
+Online database*.sql
+enrollment_db.sql
+*.zip
+
+# NOTE: schema-only / migration SQL is intentionally KEPT
+# (lms_live_migration.sql, cashier_schema_update.sql,
+#  schema_update_session.sql, cashier_fees_update.sql)
+
+# ---- Uploaded media (student/teacher PII) -------------------------------
+# Keep the folder structure (.gitkeep) but not the actual uploads.
+uploads/**
+!uploads/
+!uploads/**/
+!uploads/**/.gitkeep
+
+# Loose student photos left in the project root
+BAJUNAID GARAY.png
+Pahima Tahir.png
+
+# ---- Native app runtime ------------------------------------------------
+storage/sessions/*
+!storage/sessions/.gitkeep
+
+# ---- Laravel portal (framework artifacts) -------------------------------
+portal/vendor/
+portal/node_modules/
+portal/public/build/
+portal/public/hot
+portal/public/storage
+portal/storage/*.key
+portal/storage/app/public/*
+!portal/storage/app/public/.gitkeep
+portal/storage/framework/cache/*
+portal/storage/framework/sessions/*
+portal/storage/framework/testing/*
+portal/storage/framework/views/*
+portal/storage/logs/*
+portal/bootstrap/cache/*
+!portal/bootstrap/cache/.gitignore
+
+# ---- OS / editor junk ---------------------------------------------------
+Thumbs.db
+.DS_Store
+*.log

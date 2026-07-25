@@ -1,0 +1,18 @@
+[02-May-2026 07:00:32 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Table 'thrgd534_grading.house' doesn't exist in /home/thrgd534/public_html/enrollment/cashier/consolidation.php:92
+Stack trace:
+#0 /home/thrgd534/public_html/enrollment/cashier/consolidation.php(92): mysqli->prepare('\r\n    SELECT\r\n ...')
+#1 /home/thrgd534/public_html/enrollment/cashier/consolidation.php(139): run_sum_query(Object(mysqli), '\r\n    SELECT\r\n ...', 's', Array)
+#2 {main}
+  thrown in /home/thrgd534/public_html/enrollment/cashier/consolidation.php on line 92
+[02-May-2026 07:00:35 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Table 'thrgd534_grading.house' doesn't exist in /home/thrgd534/public_html/enrollment/cashier/consolidation.php:92
+Stack trace:
+#0 /home/thrgd534/public_html/enrollment/cashier/consolidation.php(92): mysqli->prepare('\r\n    SELECT\r\n ...')
+#1 /home/thrgd534/public_html/enrollment/cashier/consolidation.php(139): run_sum_query(Object(mysqli), '\r\n    SELECT\r\n ...', 's', Array)
+#2 {main}
+  thrown in /home/thrgd534/public_html/enrollment/cashier/consolidation.php on line 92
+[02-May-2026 07:00:36 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Table 'thrgd534_grading.house' doesn't exist in /home/thrgd534/public_html/enrollment/cashier/consolidation.php:92
+Stack trace:
+#0 /home/thrgd534/public_html/enrollment/cashier/consolidation.php(92): mysqli->prepare('\r\n    SELECT\r\n ...')
+#1 /home/thrgd534/public_html/enrollment/cashier/consolidation.php(139): run_sum_query(Object(mysqli), '\r\n    SELECT\r\n ...', 's', Array)
+#2 {main}
+  thrown in /home/thrgd534/public_html/enrollment/cashier/consolidation.php on line 92

@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ITFA — SOA to Payment Process</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  @page { size: A4; margin: 0; }
+  html, body { font-family: 'Segoe UI', Arial, sans-serif; color: #1f2937; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { width: 210mm; min-height: 297mm; padding: 14mm 14mm 12mm; margin: 0 auto; background: #fff; position: relative; page-break-after: always; }
+  .page:last-child { page-break-after: auto; }
+
+  /* Header */
+  .hd { display: flex; align-items: center; gap: 14px; background: linear-gradient(135deg,#1e1b4b,#4338ca); color: #fff; border-radius: 16px; padding: 16px 22px; }
+  .hd .logo { width: 56px; height: 56px; background: #fff; border-radius: 12px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .hd .logo img { width: 50px; height: 50px; object-fit: contain; }
+  .hd h1 { font-size: 21px; letter-spacing: .3px; }
+  .hd p { font-size: 11.5px; color: #c7d2fe; margin-top: 3px; }
+  .hd .tag { margin-left: auto; text-align: right; font-size: 10px; color: #c7d2fe; }
+
+  /* Legend */
+  .legend { display: flex; gap: 14px; margin: 12px 0 6px; flex-wrap: wrap; }
+  .legend .item { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 600; color: #374151; }
+  .dot { width: 12px; height: 12px; border-radius: 3px; }
+  .c-cashier { background: #4f46e5; } .c-registrar { background: #059669; }
+  .c-student { background: #d97706; } .c-system { background: #475569; }
+
+  .section-title { font-size: 14px; font-weight: 800; color: #1e1b4b; margin: 16px 0 4px; letter-spacing: .3px; display: flex; align-items: center; gap: 8px; }
+  .section-title .badge { background: #eef2ff; color: #4338ca; font-size: 10px; padding: 2px 9px; border-radius: 999px; font-weight: 700; }
+  .section-sub { font-size: 10.5px; color: #6b7280; margin-bottom: 10px; }
+
+  /* Step card */
+  .flow { display: flex; flex-direction: column; gap: 0; }
+  .step { display: flex; gap: 12px; position: relative; padding-bottom: 14px; }
+  .rail { display: flex; flex-direction: column; align-items: center; }
+  .num { width: 30px; height: 30px; border-radius: 50%; color: #fff; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,.18); }
+  .line { width: 2px; flex: 1; background: #e5e7eb; margin: 3px 0; }
+  .card { flex: 1; border: 1.5px solid #e5e7eb; border-left-width: 5px; border-radius: 12px; padding: 9px 13px; background: #fff; }
+  .card .top { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+  .card .title { font-size: 12.5px; font-weight: 700; color: #111827; }
+  .chip { font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: 2px 7px; border-radius: 999px; color: #fff; }
+  .card .desc { font-size: 10.3px; color: #4b5563; line-height: 1.45; }
+  .card .where { font-size: 9px; color: #6366f1; font-family: 'Consolas', monospace; margin-top: 3px; }
+
+  .cashier .num, .chip.cashier { background: #4f46e5; } .cashier.card { border-color: #c7d2fe; border-left-color: #4f46e5; }
+  .registrar .num, .chip.registrar { background: #059669; } .registrar.card { border-color: #a7f3d0; border-left-color: #059669; }
+  .student .num, .chip.student { background: #d97706; } .student.card { border-color: #fde68a; border-left-color: #d97706; }
+  .system .num, .chip.system { background: #475569; } .system.card { border-color: #cbd5e1; border-left-color: #475569; }
+
+  .branch { margin: 6px 0 12px; border: 2px dashed #f59e0b; background: #fffbeb; border-radius: 12px; padding: 9px 13px; font-size: 10.5px; color: #92400e; }
+  .branch b { color: #b45309; }
+
+  .notes { margin-top: 12px; border-radius: 12px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 11px 14px; }
+  .notes h3 { font-size: 11.5px; color: #1e1b4b; margin-bottom: 6px; }
+  .notes ul { margin-left: 16px; }
+  .notes li { font-size: 10px; color: #475569; line-height: 1.6; }
+  .ft { position: absolute; bottom: 7mm; left: 14mm; right: 14mm; display: flex; justify-content: space-between; font-size: 8.5px; color: #94a3b8; border-top: 1px solid #e5e7eb; padding-top: 5px; }
+  .pill { display:inline-block; background:#eef2ff; color:#4338ca; font-weight:700; padding:1px 6px; border-radius:5px; font-size:9px; }
+</style>
+</head>
+<body>
+
+<!-- ============================ PAGE 1 ============================ -->
+<div class="page">
+  <div class="hd">
+    <div class="logo"><img src="../itfalogo.png" alt="ITFA"></div>
+    <div>
+      <h1>From SOA to Payment — Process Guide</h1>
+      <p>IBN Taimiyah Foundation Academy, Inc. · Cashier &amp; Registrar Financial Workflow</p>
+    </div>
+    <div class="tag">Statement of Account<br>&amp; Collection Flow</div>
+  </div>
+
+  <div class="legend">
+    <div class="item"><span class="dot c-student"></span>Student / Parent</div>
+    <div class="item"><span class="dot c-cashier"></span>Cashier</div>
+    <div class="item"><span class="dot c-registrar"></span>Registrar</div>
+    <div class="item"><span class="dot c-system"></span>System (automatic)</div>
+  </div>
+
+  <div class="section-title"><span class="badge">PART 1</span> Standard Flow — Generate SOA &amp; Collect Payment</div>
+  <div class="section-sub">The normal path when a student pays the amount due on their Statement of Account.</div>
+
+  <div class="flow">
+
+    <div class="step">
+      <div class="rail"><div class="num cashier">1</div><div class="line"></div></div>
+      <div class="card cashier">
+        <div class="top"><span class="chip cashier">Cashier</span><span class="title">Generate the Statement of Account (SOA)</span></div>
+        <div class="desc">The cashier generates the SOA for a student (or a whole section/grade), choosing the month(s) to bill. The system produces the official SOA slip with a unique, gap-free SOA number and barcode.</div>
+        <div class="where">cashier &rsaquo; Generate SOA</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="rail"><div class="num student">2</div><div class="line"></div></div>
+      <div class="card student">
+        <div class="top"><span class="chip student">Student</span><span class="title">Receives the SOA</span></div>
+        <div class="desc">The student/parent receives the printed SOA showing the fee breakdown (Tuition, Misc, School Improvement, Books) and the <b>amount due for the month</b>. The barcode lets the cashier pull it up instantly.</div>
+      </div>
+    </div>
+
+    <div class="branch">
+      ◆ <b>Decision:</b> Can the student pay the amount due now? &nbsp; → <b>YES:</b> continue to Step 3. &nbsp; → <b>NO:</b> go to <b>Part 2 — Promissory Note</b> (next page).
+    </div>
+
+    <div class="step">
+      <div class="rail"><div class="num cashier">3</div><div class="line"></div></div>
+      <div class="card cashier">
+        <div class="top"><span class="chip cashier">Cashier</span><span class="title">Collect Payment</span></div>
+        <div class="desc">The cashier scans the SOA / OR barcode (or searches the student), selects the month(s) being paid, enters the amount tendered, and posts the payment.</div>
+        <div class="where">cashier &rsaquo; Collect Payment</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="rail"><div class="num system">4</div><div class="line"></div></div>
+      <div class="card system">
+        <div class="top"><span class="chip system">System</span><span class="title">Posts payment &amp; issues Official Receipt</span></div>
+        <div class="desc">In one atomic step the system allocates the payment to the oldest unpaid months, updates the running balance, issues a gap-free <b>Official Receipt (OR)</b>, and records it to the ledger and the day's collection.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="rail"><div class="num student">5</div></div>
+      <div class="card student">
+        <div class="top"><span class="chip student">Student</span><span class="title">Receives Official Receipt</span></div>
+        <div class="desc">The student gets the printed OR as proof of payment. Their balance and payment history update immediately — visible in the Student Portal.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="notes">
+    <h3>↪ End of day &amp; banking</h3>
+    <ul>
+      <li>The cashier performs an <b>End-of-Day Close</b> (counts cash, records over/short, prints a Z-report).</li>
+      <li>Every Thursday, collected cash is deposited to the bank and a <b>Deposit Certification</b> is printed.</li>
+      <li>A payment posted in error can be <b>Voided</b> (Payment History / Void–Refund), which restores the student's balance.</li>
+    </ul>
+  </div>
+
+  <div class="ft"><span>ITFA — SOA to Payment Process</span><span>Page 1 of 2</span></div>
+</div>
+
+<!-- ============================ PAGE 2 ============================ -->
+<div class="page">
+  <div class="hd">
+    <div class="logo"><img src="../itfalogo.png" alt="ITFA"></div>
+    <div>
+      <h1>Promissory Note Scenario</h1>
+      <p>When a student cannot pay the current SOA in full</p>
+    </div>
+    <div class="tag">Deferred-Payment<br>Arrangement</div>
+  </div>
+
+  <div class="legend">
+    <div class="item"><span class="dot c-student"></span>Student / Parent</div>
+    <div class="item"><span class="dot c-cashier"></span>Cashier</div>
+    <div class="item"><span class="dot c-registrar"></span>Registrar</div>
+    <div class="item"><span class="dot c-system"></span>System (automatic)</div>
+  </div>
+
+  <div class="section-title"><span class="badge">PART 2</span> Securing a Promissory Note</div>
+  <div class="section-sub">Branches from Part 1 when the student cannot settle the current SOA. The note is raised against the <b>current SOA amount</b>, not the whole-year balance.</div>
+
+  <div class="flow">
+
+    <div class="step">
+      <div class="rail"><div class="num student">1</div><div class="line"></div></div>
+      <div class="card student">
+        <div class="top"><span class="chip student">Student</span><span class="title">Cannot pay — proceeds to the Registrar</span></div>
+        <div class="desc">Holding the current SOA, the student/parent goes to the Registrar's Office to request a promissory (deferred-payment) arrangement.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="rail"><div class="num registrar">2</div><div class="line"></div></div>
+      <div class="card registrar">
+        <div class="top"><span class="chip registrar">Registrar</span><span class="title">Look up the student &amp; review the SOA</span></div>
+        <div class="desc">Search by Student ID, LRN, or Name. The system shows the student's <b>current SOA</b> (number, months, amount due), the year balance for context, and any previous promissory notes.</div>
+        <div class="where">registrar &rsaquo; Promissory Notes &rsaquo; New</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="rail"><div class="num registrar">3</div><div class="line"></div></div>
+      <div class="card registrar">
+        <div class="top"><span class="chip registrar">Registrar</span><span class="title">Issue the Promissory Note</span></div>
+        <div class="desc">Enter the amount covered (up to the current SOA due), the <b>promised payment date</b>, and the reason. The system assigns an ID (e.g. <b>PN-2026-000001</b>) and prints the note — signed by the Registrar and the Student/Parent/Guardian.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="rail"><div class="num student">4</div><div class="line"></div></div>
+      <div class="card student">
+        <div class="top"><span class="chip student">Student</span><span class="title">Presents the note to the Cashier</span></div>
+        <div class="desc">The student brings the printed Promissory Note to the Cashier's window.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="rail"><div class="num cashier">5</div><div class="line"></div></div>
+      <div class="card cashier">
+        <div class="top"><span class="chip cashier">Cashier</span><span class="title">Verify the Promissory Note</span></div>
+        <div class="desc">The cashier scans / enters the PN ID. The system validates it and records it as an <b>approved deferred-payment arrangement</b> (marked “Cashier Verified”).</div>
+        <div class="where">cashier &rsaquo; Verify Promissory</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="rail"><div class="num system">6</div><div class="line"></div></div>
+      <div class="card system">
+        <div class="top"><span class="chip system">System</span><span class="title">Tracks status &amp; flags the SOA</span></div>
+        <div class="desc">The note stays <span class="pill">Pending</span>. The student's SOA shows a warning: <i>“This student has an unpaid promissory note that must be settled.”</i> If the promised date passes unpaid, the note becomes <span class="pill">Overdue</span> automatically.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="rail"><div class="num student">7</div><div class="line"></div></div>
+      <div class="card student">
+        <div class="top"><span class="chip student">Student</span><span class="title">Pays on/before the promised date</span></div>
+        <div class="desc">The student returns and pays at the Cashier. Payment is posted normally (Part 1, Steps 3–5) and an OR is issued.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="rail"><div class="num system">8</div></div>
+      <div class="card system">
+        <div class="top"><span class="chip system">System</span><span class="title">Note marked Paid · arrangement closed</span></div>
+        <div class="desc">The promissory note is set to <span class="pill">Paid</span> and the SOA warning clears. If a new SOA is generated while a note is still unpaid, it is flagged so the obligation is never missed.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="notes">
+    <h3>★ Key rules</h3>
+    <ul>
+      <li>A promissory note is tied to the <b>current SOA's amount due</b> — the amount covered can never exceed it.</li>
+      <li>Statuses: <b>Pending</b> → <b>Paid</b> (settled) · <b>Overdue</b> (promised date passed) · <b>Cancelled</b> (voided by Registrar).</li>
+      <li>Every Registrar and Cashier action on a note is recorded in the <b>audit log</b>.</li>
+      <li>The Registrar dashboard shows totals: active notes, overdue notes, and the total amount under promissory arrangement.</li>
+    </ul>
+  </div>
+
+  <div class="ft"><span>ITFA — Promissory Note Scenario</span><span>Page 2 of 2</span></div>
+</div>
+
+</body>
+</html>

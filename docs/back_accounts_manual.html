@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Back Accounts — Cashier User Manual | ITFA I-SMS</title>
+<style>
+    @page { size: A4 portrait; margin: 14mm 14mm 16mm; }
+    * { box-sizing: border-box; }
+    body {
+        font-family: 'Segoe UI', 'Inter', Arial, sans-serif;
+        color: #1e293b; margin: 0; font-size: 10.5pt; line-height: 1.55;
+        -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    h1, h2, h3, h4 { margin: 0; }
+    .page { page-break-after: always; }
+    .page:last-child { page-break-after: auto; }
+
+    /* ── Cover ───────────────────────────────────────────── */
+    .cover {
+        height: 262mm; display: flex; flex-direction: column; justify-content: center;
+        text-align: center; background: linear-gradient(160deg,#1e1b4b 0%,#312e81 55%,#4338ca 100%);
+        color: #fff; margin: -14mm -14mm 0; padding: 0 22mm; position: relative;
+    }
+    .cover img { width: 70px; height: 70px; object-fit: contain; margin: 0 auto 16px; background:#fff; border-radius:14px; padding:6px; }
+    .cover .school { font-size: 10pt; letter-spacing: 3px; text-transform: uppercase; color: #a5b4fc; font-weight: 700; }
+    .cover h1 { font-size: 31pt; font-weight: 900; margin: 12px 0 6px; letter-spacing: -0.5px; }
+    .cover .sub { font-size: 13pt; color: #c7d2fe; font-weight: 600; }
+    .cover .rule { width: 60px; height: 3px; background: #818cf8; margin: 20px auto; border-radius: 2px; }
+    .cover .desc { font-size: 10.5pt; color: #ddd6fe; max-width: 122mm; margin: 0 auto; line-height: 1.7; }
+    .cover .meta { position: absolute; bottom: 22mm; left: 0; right: 0; font-size: 8.5pt; color: #a5b4fc; }
+    .cover .badge { display:inline-block; border:1px solid rgba(255,255,255,.3); border-radius:999px; padding:4px 14px; font-size:8.5pt; font-weight:700; letter-spacing:1px; margin-top:14px; }
+
+    /* ── Section headers ─────────────────────────────────── */
+    .sec-head { border-bottom: 2.5px solid #1e1b4b; padding-bottom: 7px; margin-bottom: 14px; display: flex; align-items: baseline; gap: 10px; }
+    .sec-head .n { background: #1e1b4b; color: #fff; font-weight: 800; font-size: 10pt; width: 22px; height: 22px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+    .sec-head h2 { font-size: 16pt; font-weight: 800; color: #1e1b4b; }
+    h3 { font-size: 11.5pt; font-weight: 800; color: #312e81; margin: 16px 0 7px; }
+
+    /* ── Blocks ──────────────────────────────────────────── */
+    .lead { font-size: 10.5pt; color: #475569; margin-bottom: 12px; }
+    .callout { border-left: 4px solid; border-radius: 0 8px 8px 0; padding: 10px 13px; margin: 12px 0; font-size: 9.8pt; }
+    .c-key  { border-color:#4338ca; background:#eef2ff; }
+    .c-warn { border-color:#b45309; background:#fffbeb; }
+    .c-dang { border-color:#b91c1c; background:#fef2f2; }
+    .c-ok   { border-color:#047857; background:#ecfdf5; }
+    /* Only the callout's leading heading is a block; inline <b> must stay inline. */
+    .callout > b:first-child { display:block; margin-bottom:2px; }
+
+    /* ── Steps ───────────────────────────────────────────── */
+    .step { display: flex; gap: 11px; margin-bottom: 11px; break-inside: avoid; }
+    .step .num { flex: none; width: 23px; height: 23px; border-radius: 50%; background: #4338ca; color: #fff; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; }
+    .step .body { flex: 1; }
+    .step .body b { color: #1e1b4b; }
+    .step .body p { margin: 2px 0 0; color: #475569; font-size: 9.8pt; }
+
+    /* ── Tables ──────────────────────────────────────────── */
+    table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 9.3pt; break-inside: avoid; }
+    thead th { background: #1e1b4b; color: #fff; text-align: left; padding: 6px 8px; font-weight: 700; }
+    tbody td { border-bottom: 1px solid #e2e8f0; padding: 6px 8px; vertical-align: top; }
+    tbody tr:nth-child(even) { background: #f8fafc; }
+    td.c, th.c { text-align: center; }
+
+    /* ── Pills ───────────────────────────────────────────── */
+    .pill { display: inline-block; border-radius: 999px; padding: 1px 9px; font-size: 8.3pt; font-weight: 800; border: 1px solid; }
+    .p-unpaid { background:#ffe4e6; color:#9f1239; border-color:#fda4af; }
+    .p-partial{ background:#fef3c7; color:#92400e; border-color:#fcd34d; }
+    .p-paid   { background:#d1fae5; color:#065f46; border-color:#6ee7b7; }
+    .p-cancel { background:#f1f5f9; color:#475569; border-color:#cbd5e1; }
+
+    /* ── Mock UI ─────────────────────────────────────────── */
+    .mock { border: 1px solid #cbd5e1; border-radius: 9px; overflow: hidden; margin: 10px 0; font-size: 8.8pt; break-inside: avoid; }
+    .mock .bar { background: #f1f5f9; border-bottom: 1px solid #cbd5e1; padding: 5px 10px; font-weight: 800; color: #334155; font-size: 8.5pt; }
+    .mock .in { padding: 10px; }
+    .fld { border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px 8px; background: #fff; color: #64748b; margin-bottom: 6px; }
+    .fld .lbl { font-size: 7.5pt; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; display: block; }
+    .btn { display:inline-block; background:#4338ca; color:#fff; border-radius:6px; padding:4px 12px; font-weight:800; font-size:8.5pt; }
+    .btn.g { background:#059669; } .btn.a { background:#d97706; } .btn.r { background:#e11d48; }
+
+    /* ── SOA slip sample ─────────────────────────────────── */
+    .slip { border: 1.5px solid #475569; border-radius: 6px; padding: 9px 11px; font-size: 8.6pt; background:#fff; margin:9px 0; }
+    .slip .row { display:flex; justify-content:space-between; border-bottom:1px dotted #cbd5e1; padding:2px 0; }
+    .slip .tot { display:flex; justify-content:space-between; font-weight:900; border-top:1.5px solid #1e293b; margin-top:3px; padding-top:3px; }
+    .slip .warnbox { border:1px solid #b91c1c; color:#b91c1c; font-weight:800; padding:3px 6px; border-radius:3px; margin-top:7px; font-size:8pt; }
+
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .foot { position: fixed; bottom: 6mm; left: 14mm; right: 14mm; font-size: 7.5pt; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 4px; display: flex; justify-content: space-between; }
+    code { background:#eef2ff; color:#3730a3; padding:1px 5px; border-radius:3px; font-family:Consolas,monospace; font-size:8.8pt; font-weight:600; }
+    ul { margin: 5px 0 5px 16px; padding: 0; } li { margin-bottom: 3px; color:#475569; font-size:9.8pt; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════ COVER ══════════════ -->
+<div class="page cover">
+    <img src="../itfalogo.png" alt="ITFA">
+    <div class="school">Ibn Taimiyah Foundation Academy, Inc.</div>
+    <h1>Back Accounts</h1>
+    <div class="sub">Cashier User Manual</div>
+    <div class="rule"></div>
+    <div class="desc">
+        A complete, step-by-step guide to recording a student's unpaid balance from a
+        previous school year, collecting payment against it, issuing an Official Receipt,
+        and understanding how it appears on the Statement of Account.
+    </div>
+    <div class="badge">I-SMS &nbsp;·&nbsp; CASHIER MODULE</div>
+    <div class="meta">School Management System (I-SMS) &nbsp;·&nbsp; Office of the Cashier &nbsp;·&nbsp; Version 1.0</div>
+</div>
+
+<!-- ══════════════ 1. CONCEPT ══════════════ -->
+<div class="page">
+    <div class="sec-head"><span class="n">1</span><h2>What is a Back Account?</h2></div>
+    <p class="lead">
+        A <b>back account</b> is money a student still owes from a <b>previous school year</b>.
+        It is separate from this year's tuition and fees. This module lets the Cashier record
+        that old debt against the student, collect it (in full or partially), and issue a receipt.
+    </p>
+
+    <div class="callout c-key">
+        <b>The one rule to remember</b>
+        A back account is a <b>warning</b> on the Statement of Account — it is <b>never added</b> to the
+        SOA's total due. This year's bill stays this year's bill. The old debt is shown so the student
+        knows to settle it, but it does not change the monthly amount they are being billed.
+    </div>
+
+    <h3>Why it is tied to the student, not the enrolment</h3>
+    <p class="lead" style="margin-bottom:8px;">
+        The back account is linked to the <b>student</b>. That means it follows them from year to year.
+        A debt from S.Y. 2023-2024 will keep appearing on their SOA in 2026-2027, and every year after,
+        until it is paid or cancelled.
+    </p>
+
+    <h3>The four statuses</h3>
+    <table>
+        <thead><tr><th style="width:90px">Status</th><th>What it means</th><th style="width:150px">Shows on the SOA?</th></tr></thead>
+        <tbody>
+            <tr><td><span class="pill p-unpaid">Unpaid</span></td><td>Recorded, nothing paid yet.</td><td>Yes — full amount</td></tr>
+            <tr><td><span class="pill p-partial">Partial</span></td><td>Some payment received, a balance remains.</td><td>Yes — remaining balance</td></tr>
+            <tr><td><span class="pill p-paid">Paid</span></td><td>Fully settled. Balance is zero.</td><td>No — it disappears</td></tr>
+            <tr><td><span class="pill p-cancel">Cancelled</span></td><td>Written off or entered in error. Record kept for audit.</td><td>No — it disappears</td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout c-ok">
+        <b>Status is automatic</b>
+        You never set the status by hand. The system moves it
+        <span class="pill p-unpaid">Unpaid</span> →
+        <span class="pill p-partial">Partial</span> →
+        <span class="pill p-paid">Paid</span> as payments come in, and back again if a payment is voided.
+    </div>
+
+    <h3>Where the existing records came from</h3>
+    <p class="lead">
+        All <b>491</b> historical back-account records from S.Y. 2023-2024 were already imported into this
+        module, including <b>351 unpaid accounts</b>. They are searchable from day one — you do not need to
+        re-enter them. You only record a back account manually for a debt the system does not already know about.
+    </p>
+</div>
+
+<!-- ══════════════ 2. THE SCREEN ══════════════ -->
+<div class="page">
+    <div class="sec-head"><span class="n">2</span><h2>Opening the Module</h2></div>
+
+    <div class="step"><div class="num">1</div><div class="body"><b>Log in</b> to I-SMS with your Cashier account.</div></div>
+    <div class="step"><div class="num">2</div><div class="body"><b>In the left sidebar, open <code>Collections</code> → <code>Back Accounts</code>.</b>
+        <p>Only Cashier and Super Admin users can see this menu.</p></div></div>
+
+    <h3>The four counters at the top</h3>
+    <table>
+        <thead><tr><th style="width:120px">Counter</th><th>Meaning</th></tr></thead>
+        <tbody>
+            <tr><td><b>Outstanding</b></td><td>Total pesos still owed across every unpaid and partial back account. This is your collection target.</td></tr>
+            <tr><td><b>Unpaid Accounts</b></td><td>How many students still owe something.</td></tr>
+            <tr><td><b>Collected</b></td><td>Total pesos already collected through this module.</td></tr>
+            <tr><td><b>Total Records</b></td><td>Every back account on file, including paid and cancelled ones.</td></tr>
+        </tbody>
+    </table>
+
+    <h3>Finding a record</h3>
+    <p class="lead" style="margin-bottom:8px;">Use the <b>Search</b> box in the list to look up a student by <b>name, LRN, or student ID</b>.
+    Use the <b>Status</b> dropdown to show only Unpaid, Partial, Paid, or Cancelled records. Click <b>Filter</b> to apply, or <b>Clear</b> to reset.</p>
+
+    <div class="mock">
+        <div class="bar">Back Accounts — list</div>
+        <div class="in">
+            <table style="margin:0;">
+                <thead><tr><th>Student</th><th class="c">S.Y.</th><th class="c">Original</th><th class="c">Paid</th><th class="c">Balance</th><th class="c">Status</th><th class="c">Actions</th></tr></thead>
+                <tbody>
+                    <tr><td><b>ABBAS, NADIA M.</b><br><span style="color:#94a3b8;font-size:7.5pt">LRN 131260120413</span></td>
+                        <td class="c">2023-2024</td><td class="c">3,390.00</td><td class="c">0.00</td><td class="c"><b style="color:#be123c">3,390.00</b></td>
+                        <td class="c"><span class="pill p-unpaid">Unpaid</span></td>
+                        <td class="c" style="color:#4338ca;font-weight:800">Collect · Edit · Cancel</td></tr>
+                    <tr><td><b>ABBAS, AMIR A.</b><br><span style="color:#94a3b8;font-size:7.5pt">LRN 476515150171</span></td>
+                        <td class="c">2023-2024</td><td class="c">2,500.00</td><td class="c">1,000.00</td><td class="c"><b style="color:#be123c">1,500.00</b></td>
+                        <td class="c"><span class="pill p-partial">Partial</span></td>
+                        <td class="c" style="color:#4338ca;font-weight:800">Collect · Edit</td></tr>
+                    <tr><td><b>ABAS, ABDULAZIS E.</b><br><span style="color:#94a3b8;font-size:7.5pt">LRN 8258656967001</span></td>
+                        <td class="c">2023-2024</td><td class="c">760.00</td><td class="c">760.00</td><td class="c" style="color:#94a3b8">0.00</td>
+                        <td class="c"><span class="pill p-paid">Paid</span></td>
+                        <td class="c" style="color:#4338ca;font-weight:800">View · Edit</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="callout c-key">
+        <b>Reading the list</b>
+        Unpaid and partial accounts are always pushed to the <b>top</b> of the list, largest balance first —
+        so the students who owe the most are the first thing you see.
+    </div>
+</div>
+
+<!-- ══════════════ 3. RECORD ══════════════ -->
+<div class="page">
+    <div class="sec-head"><span class="n">3</span><h2>Task 1 — Record a Back Account</h2></div>
+    <p class="lead">Use this when a student has an old unpaid balance that is not yet in the system.</p>
+
+    <div class="step"><div class="num">1</div><div class="body"><b>Open the <code>➕ Record a Back Account</code> panel.</b><p>It is open by default at the top of the page.</p></div></div>
+    <div class="step"><div class="num">2</div><div class="body"><b>Find the student.</b>
+        <p>Type at least <b>2 characters</b> of their surname or LRN. A list appears as you type.
+        Use the <b>↑ / ↓ arrow keys</b> to move through the results and press <b>Enter</b> to select — or just click the name.</p></div></div>
+    <div class="step"><div class="num">3</div><div class="body"><b>Confirm the right student is picked.</b>
+        <p>Their name, LRN and last enrolled school year appear in a blue box. If it is the wrong person, click <b>change</b> and search again.</p></div></div>
+    <div class="step"><div class="num">4</div><div class="body"><b>Enter the S.Y. of the debt.</b>
+        <p>The school year the money was owed <i>from</i> — for example <code>2023-2024</code>. <b>Not</b> the current year. Pick from the dropdown or type it.</p></div></div>
+    <div class="step"><div class="num">5</div><div class="body"><b>Enter the Amount.</b><p>The full amount owed, in pesos. Must be greater than zero.</p></div></div>
+    <div class="step"><div class="num">6</div><div class="body"><b>Optionally add Grade &amp; Section and Remarks.</b>
+        <p>Remarks are free text — use them to explain the debt, e.g. <i>"unpaid tuition balance carried from S.Y. 2023-2024"</i>. This helps whoever reads the record later.</p></div></div>
+    <div class="step"><div class="num">7</div><div class="body"><b>Click <span class="btn">Save Back Account</span>.</b>
+        <p>The record is created as <span class="pill p-unpaid">Unpaid</span> and you are taken straight to it, ready to collect.</p></div></div>
+
+    <div class="mock">
+        <div class="bar">➕ Record a Back Account</div>
+        <div class="in">
+            <div class="fld"><span class="lbl">Student *</span>Type an LRN or name, then pick from the list…</div>
+            <div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:6px;padding:5px 8px;margin-bottom:7px;">
+                <b style="color:#1e1b4b">ABBAS, NADIA</b> <span style="color:#64748b">· LRN 131260120413 · last enrolled 2026-2027</span>
+                <span style="color:#4338ca;font-weight:800"> change</span>
+            </div>
+            <div class="grid2" style="gap:6px;">
+                <div class="fld"><span class="lbl">S.Y. of the debt *</span>2023-2024</div>
+                <div class="fld"><span class="lbl">Amount (₱) *</span>3,390.00</div>
+            </div>
+            <div class="fld"><span class="lbl">Remarks (optional)</span>unpaid tuition balance carried from S.Y. 2023-2024</div>
+            <span class="btn">Save Back Account</span>
+        </div>
+    </div>
+
+    <div class="callout c-warn">
+        <b>If the student does not appear in the search</b>
+        Only students with an enrolment record can be selected — that link is what makes the warning show on their SOA.
+        If a student is genuinely missing, they must be enrolled/registered first. Try searching by <b>surname</b> or by the
+        <b>full LRN</b> before assuming they are absent.
+    </div>
+</div>
+
+<!-- ══════════════ 4. COLLECT ══════════════ -->
+<div class="page">
+    <div class="sec-head"><span class="n">4</span><h2>Task 2 — Collect a Payment</h2></div>
+    <p class="lead">This is the main daily task: taking money against an old balance and issuing the receipt.</p>
+
+    <div class="step"><div class="num">1</div><div class="body"><b>Find the student</b> in the list and click <span style="color:#4338ca;font-weight:800">Collect</span>.</div></div>
+    <div class="step"><div class="num">2</div><div class="body"><b>Check the three boxes: Original, Paid, Balance.</b>
+        <p>Confirm the balance matches what the payer expects before taking money.</p></div></div>
+    <div class="step"><div class="num">3</div><div class="body"><b>Enter the Amount to collect.</b>
+        <p>It defaults to the <b>full remaining balance</b>. If the student is paying only part of it, type the smaller amount — <b>partial payments are allowed</b>.</p></div></div>
+    <div class="step"><div class="num">4</div><div class="body"><b>Choose the Method.</b><p>Cash, GCash, Maya, Bank, or Check.</p></div></div>
+    <div class="step"><div class="num">5</div><div class="body"><b>Enter a Reference # if not cash.</b>
+        <p>Optional, but strongly recommended for GCash / Maya / Bank / Check so the payment can be traced later.</p></div></div>
+    <div class="step"><div class="num">6</div><div class="body"><b>Click <span class="btn g">Collect &amp; Print OR</span> and confirm.</b>
+        <p>The receipt opens automatically and the print dialog appears. The balance updates immediately.</p></div></div>
+
+    <div class="grid2">
+        <div class="mock" style="margin:0;">
+            <div class="bar">Collect payment</div>
+            <div class="in">
+                <div class="fld"><span class="lbl">Amount to collect (₱)</span>3,390.00</div>
+                <div class="fld"><span class="lbl">Method</span>Cash</div>
+                <div class="fld"><span class="lbl">Reference # (optional)</span>&nbsp;</div>
+                <span class="btn g">Collect &amp; Print OR</span>
+            </div>
+        </div>
+        <div class="mock" style="margin:0;">
+            <div class="bar">Official Receipt (A5)</div>
+            <div class="in" style="text-align:center;">
+                <div style="font-weight:900;color:#1e1b4b;font-size:8pt;">IBN TAIMIYAH FOUNDATION ACADEMY, INC.</div>
+                <div style="font-weight:800;letter-spacing:2px;margin-top:5px;font-size:8pt;">OFFICIAL RECEIPT</div>
+                <div style="color:#b91c1c;font-weight:800;font-size:7pt;letter-spacing:1px;">BACK ACCOUNT PAYMENT</div>
+                <div style="text-align:left;margin-top:6px;font-size:8pt;">
+                    <div>No. <b style="font-family:Consolas">OR-2026-000001</b></div>
+                    <div>Received from: <b>ABBAS, NADIA</b></div>
+                    <div style="border-top:1px solid #cbd5e1;margin-top:4px;padding-top:3px;">
+                        Back Account — S.Y. 2023-2024 <b style="float:right">₱3,390.00</b></div>
+                    <div style="background:#ecfdf5;border:1px solid #059669;color:#065f46;border-radius:3px;padding:2px 5px;margin-top:5px;font-size:7.5pt;font-weight:800;">
+                        FULLY SETTLED <span style="float:right">₱0.00</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="callout c-ok">
+        <b>The receipt tells the student where they stand</b>
+        Every back-account OR shows a box at the bottom: either <b>FULLY SETTLED</b> in green, or the
+        <b>Remaining back-account balance</b> in red. The student leaves the counter knowing exactly what is left.
+    </div>
+
+    <div class="callout c-key">
+        <b>It counts toward your day</b>
+        Back-account collections automatically join the day's totals, so they are included in your
+        <b>End-of-Day Close</b> and the <b>Collection Report</b>. You do not record them anywhere else.
+    </div>
+</div>
+
+<!-- ══════════════ 5. REPRINT / VOID ══════════════ -->
+<div class="page">
+    <div class="sec-head"><span class="n">5</span><h2>Task 3 — Reprint or Void a Payment</h2></div>
+    <p class="lead">Every payment ever taken is listed under <b>Payment History</b> on the student's back-account screen.</p>
+
+    <h3>Reprinting a receipt</h3>
+    <div class="step"><div class="num">1</div><div class="body"><b>Open the student's record</b> (click <b>Collect</b> or <b>View</b>).</div></div>
+    <div class="step"><div class="num">2</div><div class="body"><b>In Payment History, click <span style="color:#4338ca;font-weight:800">Reprint</span></b> on the payment you need.
+        <p>The original receipt opens with the same OR number. Reprinting does not create a new receipt or a new number.</p></div></div>
+
+    <h3>Voiding a payment</h3>
+    <p class="lead" style="margin-bottom:8px;">Void a payment only when it was recorded in error — wrong amount, wrong student, or a cancelled transaction.</p>
+    <div class="step"><div class="num">1</div><div class="body"><b>In Payment History, click <span style="color:#e11d48;font-weight:800">Void</span></b> on that payment.</div></div>
+    <div class="step"><div class="num">2</div><div class="body"><b>Confirm.</b>
+        <p>The payment is struck through and marked <b>Voided</b>. The student's balance is <b>restored</b>,
+        the status rolls back (e.g. <span class="pill p-paid">Paid</span> → <span class="pill p-partial">Partial</span>),
+        and the amount is <b>removed from the day's collection totals</b>.</p></div></div>
+
+    <div class="mock">
+        <div class="bar">Payment History</div>
+        <div class="in">
+            <table style="margin:0;">
+                <thead><tr><th>Date</th><th>OR #</th><th>Method</th><th class="c">Amount</th><th class="c">Status</th><th class="c">Action</th></tr></thead>
+                <tbody>
+                    <tr><td>Jul 17, 2026 9:14am</td><td style="font-family:Consolas">OR-2026-000002</td><td>GCash · REF88213</td><td class="c"><b>₱1,500.00</b></td><td class="c">Paid</td><td class="c" style="font-weight:800"><span style="color:#4338ca">Reprint</span> · <span style="color:#e11d48">Void</span></td></tr>
+                    <tr style="color:#94a3b8;text-decoration:line-through"><td>Jul 16, 2026 3:02pm</td><td style="font-family:Consolas">OR-2026-000001</td><td>Cash</td><td class="c">₱500.00</td><td class="c">Voided</td><td class="c">—</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="callout c-dang">
+        <b>A void is permanent and recorded</b>
+        A voided payment cannot be un-voided, and the voided receipt is stamped <b>VOID</b> when printed.
+        Every void is written to the audit log with your name, the date, and the amount. If you voided by mistake,
+        simply collect the payment again — a new OR number will be issued.
+    </div>
+</div>
+
+<!-- ══════════════ 6. EDIT / CANCEL ══════════════ -->
+<div class="page">
+    <div class="sec-head"><span class="n">6</span><h2>Task 4 — Correct or Cancel a Record</h2></div>
+
+    <h3>Editing an amount</h3>
+    <p class="lead" style="margin-bottom:8px;">Use <b>Edit</b> if the recorded amount, school year, section or remarks were wrong.</p>
+    <div class="step"><div class="num">1</div><div class="body"><b>Click <span style="color:#b45309;font-weight:800">Edit</span></b> on the row.</div></div>
+    <div class="step"><div class="num">2</div><div class="body"><b>Change the values and click <span class="btn a">Save</span>.</b>
+        <p>The balance and status are recalculated automatically from the payments already made.</p></div></div>
+
+    <div class="callout c-warn">
+        <b>You cannot set the amount lower than what was already paid</b>
+        If a student has paid ₱1,000, the amount cannot be edited below ₱1,000 — the system will refuse and tell you why.
+        This protects the receipts you have already issued. Void the payments first if you truly need to go lower.
+    </div>
+
+    <h3>Cancelling a back account</h3>
+    <p class="lead" style="margin-bottom:8px;">Use <b>Cancel</b> when the debt should not be collected at all — it was entered by mistake, or management has written it off.</p>
+    <div class="step"><div class="num">1</div><div class="body"><b>Click <span style="color:#e11d48;font-weight:800">Cancel</span></b> on the row and confirm.</div></div>
+    <div class="step"><div class="num">2</div><div class="body"><b>The record becomes <span class="pill p-cancel">Cancelled</span>.</b>
+        <p>Its balance drops to zero and it <b>stops appearing on the student's SOA</b>. The record itself is kept for audit — nothing is deleted.</p></div></div>
+
+    <div class="callout c-dang">
+        <b>Cancel is blocked once money has been received</b>
+        The <b>Cancel</b> option disappears as soon as a payment exists on the account. This is deliberate: you cannot
+        erase a debt the school has already collected against. Void the payments first, then cancel.
+    </div>
+
+    <h3>Quick decision guide</h3>
+    <table>
+        <thead><tr><th style="width:170px">Situation</th><th>What to do</th></tr></thead>
+        <tbody>
+            <tr><td>Wrong amount typed, no payment yet</td><td><b>Edit</b> the amount.</td></tr>
+            <tr><td>Wrong amount, payment already taken</td><td><b>Void</b> the payment, then <b>Edit</b>, then collect again.</td></tr>
+            <tr><td>Debt does not exist / entered twice</td><td><b>Cancel</b> the record.</td></tr>
+            <tr><td>Attached to the wrong student</td><td><b>Cancel</b> it, then record it again on the correct student.</td></tr>
+            <tr><td>Management wrote off the debt</td><td><b>Cancel</b>, and state the reason in Remarks first.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- ══════════════ 7. SOA ══════════════ -->
+<div class="page">
+    <div class="sec-head"><span class="n">7</span><h2>How It Appears on the SOA</h2></div>
+    <p class="lead">Once a back account is <span class="pill p-unpaid">Unpaid</span> or <span class="pill p-partial">Partial</span>,
+    it appears automatically wherever that student's Statement of Account is shown. You do not need to do anything.</p>
+
+    <h3>On the printed SOA slip</h3>
+    <div class="slip">
+        <div style="text-align:center;font-weight:900;color:#1e1b4b;">STATEMENT OF ACCOUNT — S.Y. 2026-2027</div>
+        <div style="text-align:center;font-size:7.5pt;color:#64748b;margin-bottom:5px;">ABBAS, NADIA M. · Grade 10 — Zainab</div>
+        <div class="row"><span>Tuition Fee (Month 1)</span><span>1,200.00</span></div>
+        <div class="row"><span>Miscellaneous Fee</span><span>400.00</span></div>
+        <div class="row"><span>School Improvement Fee</span><span>233.50</span></div>
+        <div class="tot"><span>Total Amount to be Paid for this month</span><span>₱1,833.50</span></div>
+        <div class="warnbox">⚠ UNPAID BACK ACCOUNT: ₱3,390.00 — S.Y. 2023-2024
+            <span style="font-weight:600">(not included in the total above — please settle at the Cashier)</span></div>
+        <div style="text-align:center;font-weight:800;font-size:8pt;margin-top:4px;">"N O &nbsp; P E R M I T &nbsp; N O &nbsp; E X A M"</div>
+    </div>
+
+    <div class="callout c-key">
+        <b>Notice what the total says</b>
+        The month's total is <b>₱1,833.50</b> — <i>not</i> ₱5,223.50. The ₱3,390 back account is printed as a
+        warning underneath and is deliberately excluded from the amount being billed this month.
+        If a parent asks "why isn't the old balance in my total?", this is the answer: it is billed
+        separately at the Cashier, not through the monthly SOA.
+    </div>
+
+    <h3>On the Student Portal</h3>
+    <p class="lead" style="margin-bottom:8px;">The student sees an amber warning panel above their Statement of Account:</p>
+    <div style="border:1px solid #fcd34d;background:#fffbeb;border-radius:8px;padding:9px 11px;font-size:9pt;">
+        <b style="color:#78350f;">⚠️ You have an unpaid back account from a previous school year.</b>
+        <div style="color:#92400e;margin-top:2px;">Total outstanding back account: <b>₱3,390.00</b> — this is <i>separate</i> from this year's balance below.
+        Please settle it at the Cashier's office.</div>
+        <div style="background:#fff;border:1px solid #fde68a;border-radius:5px;padding:3px 7px;margin-top:5px;font-size:8pt;">
+            <b>S.Y. 2023-2024</b> &nbsp; <b>₱3,390.00</b> &nbsp; <span class="pill p-unpaid">Unpaid</span></div>
+    </div>
+
+    <h3>When does it disappear?</h3>
+    <table>
+        <thead><tr><th>The warning stops showing when…</th><th style="width:130px">Status becomes</th></tr></thead>
+        <tbody>
+            <tr><td>The balance reaches zero — the student paid in full</td><td><span class="pill p-paid">Paid</span></td></tr>
+            <tr><td>The Cashier cancels the record</td><td><span class="pill p-cancel">Cancelled</span></td></tr>
+        </tbody>
+    </table>
+    <p class="lead">A <b>partial</b> payment does not remove the warning — it reduces the amount shown to the remaining balance.</p>
+</div>
+
+<!-- ══════════════ 8. TROUBLESHOOTING ══════════════ -->
+<div class="page">
+    <div class="sec-head"><span class="n">8</span><h2>Rules &amp; Troubleshooting</h2></div>
+
+    <h3>Rules the system enforces for you</h3>
+    <table>
+        <thead><tr><th style="width:44%">If you try to…</th><th>The system will…</th></tr></thead>
+        <tbody>
+            <tr><td>Collect more than the remaining balance</td><td>Refuse, and show the exact balance allowed.</td></tr>
+            <tr><td>Collect on a fully paid account</td><td>Refuse — "already fully paid".</td></tr>
+            <tr><td>Collect on a cancelled account</td><td>Refuse.</td></tr>
+            <tr><td>Edit the amount below what was already paid</td><td>Refuse, and name the amount already paid.</td></tr>
+            <tr><td>Cancel an account that has payments</td><td>Hide the Cancel option — void the payments first.</td></tr>
+            <tr><td>Save without picking a student</td><td>Refuse — "select a student first".</td></tr>
+            <tr><td>Save a zero or negative amount</td><td>Refuse.</td></tr>
+            <tr><td>Void the same payment twice</td><td>Refuse — "already voided".</td></tr>
+        </tbody>
+    </table>
+
+    <h3>Common questions</h3>
+    <table>
+        <thead><tr><th style="width:44%">Question / problem</th><th>Answer</th></tr></thead>
+        <tbody>
+            <tr><td>"Back-account tables not installed"</td><td>The database migration has not been run on this server. Contact your I-SMS administrator — they must run <code>migrations/student_back_accounts.sql</code>.</td></tr>
+            <tr><td>The student search finds nothing</td><td>Type at least 2 characters. Try the <b>surname</b> alone, or the <b>full LRN</b>. Only students with an enrolment record can be selected.</td></tr>
+            <tr><td>I recorded it on the wrong student</td><td><b>Cancel</b> the record and re-record it on the correct student. If you already collected, <b>void</b> the payment first.</td></tr>
+            <tr><td>The old balance is not on the SOA</td><td>Check the status — only <span class="pill p-unpaid">Unpaid</span> and <span class="pill p-partial">Partial</span> show. Also confirm the record is on the same student who is enrolled this year.</td></tr>
+            <tr><td>Should I add the back account to the SOA total?</td><td><b>No.</b> The system deliberately keeps them separate. Collect back accounts here, in this module.</td></tr>
+            <tr><td>Do these payments count in my End-of-Day?</td><td><b>Yes</b> — automatically, including voids, which subtract.</td></tr>
+            <tr><td>Can a student pay in instalments?</td><td>Yes. Collect any amount up to the balance, as many times as needed. Each payment gets its own OR.</td></tr>
+            <tr><td>Can I delete a back account?</td><td>No — use <b>Cancel</b>. Records are never deleted, so the audit trail stays intact.</td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout c-key">
+        <b>Everything you do here is logged</b>
+        Creating, editing, cancelling, collecting and voiding all write an audit entry with your name and the time.
+        Work confidently — but know that the record is permanent.
+    </div>
+
+    <div style="margin-top:20px;border-top:2px solid #1e1b4b;padding-top:9px;text-align:center;color:#64748b;font-size:8.5pt;">
+        <b style="color:#1e1b4b;">Need help?</b> Contact the I-SMS administrator or the Office of the Cashier.<br>
+        Ibn Taimiyah Foundation Academy, Inc. · Crossing Simuay, Sultan Kudarat, Maguindanao del Norte
+    </div>
+</div>
+
+</body>
+</html>
