@@ -15,6 +15,8 @@ class DashboardController extends TeacherController
         $sy = $this->activeSy();
 
         $classes = SchoolClass::with(['subject', 'section.gradeLevel'])
+            ->academic()
+            ->currentTerm()
             ->where('Teacher_id', $teacher->Teacher_id)
             ->where('School_year_id', $sy->School_year_id)
             ->get()

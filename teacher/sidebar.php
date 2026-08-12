@@ -47,6 +47,7 @@ $_ti = [
         <?= _t_head('Teaching') ?>
         <?= _t_nav('classes.php',  app_url('teacher/classes.php'),  'My Classes', $_ti['classes.php'],  $_page) ?>
         <?= _t_nav('advisees.php', app_url('teacher/advisees.php'), 'My Advisees', '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a3 3 0 10-2.8-4"/></svg>', $_page) ?>
+        <?= _t_nav('advisee_grades.php', app_url('teacher/advisee_grades.php'), 'Advisee Grades', '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>', $_page) ?>
         <?= _t_nav('schedule.php', app_url('teacher/schedule.php'), 'My Schedule', $_ti['schedule.php'], $_page) ?>
         <a href="<?= h(app_url('teacher/classroom.php')) ?>" target="_blank" rel="noopener"
            class="flex items-center gap-3 px-4 py-2 rounded-xl text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-colors">

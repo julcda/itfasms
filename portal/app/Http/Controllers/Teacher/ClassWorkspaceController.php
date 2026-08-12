@@ -32,13 +32,7 @@ class ClassWorkspaceController extends TeacherController
     {
         $class = $this->ownedClass($request, $classId);
 
-        $roster = StudentClass::with('studentInfo')
-            ->where('class_id', $classId)
-            ->get()
-            ->map(fn (StudentClass $sc) => $sc->studentInfo)
-            ->filter()
-            ->sortBy(fn ($s) => $s->Lastname . $s->Firstname)
-            ->values();
+        $roster = $class->rosterStudents();
 
         return view('teacher.workspace', [
             'tab' => 'students', 'class' => $class, 'roster' => $roster,

@@ -144,8 +144,9 @@ function gp_set_current(mysqli $db, int $periodId): void
 /**
  * The class roster with each student's grade for one period.
  *
- * Only officially enrolled students appear: membership comes from
- * student_classes, not from the grade table.
+ * Only officially enrolled students appear: membership is derived LIVE from
+ * section (studentinfo.Section = the class's section), not the grade table —
+ * so a class always shows exactly its section's students.
  */
 function grade_roster(mysqli $db, int $classId, int $periodId): array
 {
@@ -154,13 +155,13 @@ function grade_roster(mysqli $db, int $classId, int $periodId): array
                 si.Status AS student_status,
                 sg.id AS grade_id, sg.grade, sg.remarks, sg.status AS grade_status,
                 sg.updated_at, sg.review_note, sg.reviewed_at
-         FROM student_classes sc
-         JOIN studentinfo si ON si.student_id = sc.student_id
+         FROM classes c
+         JOIN studentinfo si ON si.Section = c.Section_id AND si.School_year_id = c.School_year_id
          LEFT JOIN student_grade sg
-                ON sg.class_id = sc.class_id
+                ON sg.class_id = c.Class_id
                AND sg.student_id = si.student_id
                AND sg.grading_period_id = ?
-         WHERE sc.class_id = ?
+         WHERE c.Class_id = ?
          ORDER BY si.Lastname, si.Firstname"
     );
     $stmt->bind_param('ii', $periodId, $classId);
@@ -171,7 +172,11 @@ function grade_roster(mysqli $db, int $classId, int $periodId): array
 /** Is this student actually on this class roster? */
 function grade_student_in_class(mysqli $db, int $classId, int $studentId): bool
 {
-    $stmt = $db->prepare('SELECT 1 FROM student_classes WHERE class_id = ? AND student_id = ? LIMIT 1');
+    $stmt = $db->prepare(
+        'SELECT 1 FROM classes c
+         JOIN studentinfo si ON si.Section = c.Section_id AND si.School_year_id = c.School_year_id
+         WHERE c.Class_id = ? AND si.student_id = ? LIMIT 1'
+    );
     $stmt->bind_param('ii', $classId, $studentId);
     $stmt->execute();
     return stmt_fetch_assoc($stmt) !== null;
@@ -449,12 +454,13 @@ function review_queue(mysqli $db, array $user, int $syId, int $periodId): array
 {
     $superAdmin = is_super_admin($user);
     $uid        = (int) ($user['id'] ?? 0);
+    $termFilter = _term_class_filter($db, $syId, $periodId);   // SHS: only this Term's classes
 
     $sql =
         "SELECT c.Class_id, c.Time,
                 s.Subject_name, sec.Section_name, gl.Gradelevel,
                 t.Fullname AS teacher_name, t.Firstname AS t_first, t.Lastname AS t_last,
-                (SELECT COUNT(*) FROM student_classes sc WHERE sc.class_id = c.Class_id) AS student_count,
+                (SELECT COUNT(*) FROM studentinfo si WHERE si.Section = c.Section_id AND si.School_year_id = c.School_year_id) AS student_count,
                 SUM(sg.grade IS NOT NULL)              AS encoded,
                 SUM(sg.status = 'Draft')               AS draft,
                 SUM(sg.status = 'Submitted')           AS submitted,
@@ -467,7 +473,7 @@ function review_queue(mysqli $db, array $user, int $syId, int $periodId): array
          LEFT JOIN section    sec ON sec.Section_id  = c.Section_id
          LEFT JOIN gradelevel gl  ON gl.Gradelevel_id = c.GradeLevel_id
          LEFT JOIN teacher    t   ON t.Teacher_id    = c.Teacher_id
-         WHERE c.School_year_id = ?" . ($superAdmin ? '' : ' AND c.user_id = ?') .
+         WHERE c.School_year_id = ? AND COALESCE(s.is_academic, 1) = 1" . $termFilter . ($superAdmin ? '' : ' AND c.user_id = ?') .
         " GROUP BY c.Class_id
           ORDER BY submitted DESC, encoded DESC, gl.Gradelevel_id, sec.Section_name";
 
@@ -791,19 +797,19 @@ function student_grade_slip(mysqli $db, int $studentInfoId, int $periodId): arra
                 t.Fullname AS teacher_name, t.Firstname AS t_first, t.Lastname AS t_last,
                 sg.grade, sg.remarks, sg.status AS grade_status,
                 r.status AS release_status, r.released_at
-         FROM student_classes sc
-         JOIN classes cl        ON cl.Class_id = sc.class_id
+         FROM studentinfo si
+         JOIN classes cl        ON cl.Section_id = si.Section AND cl.School_year_id = si.School_year_id
          LEFT JOIN subject s    ON s.Subject_id = cl.Subject_id
          LEFT JOIN teacher t    ON t.Teacher_id = cl.Teacher_id
          LEFT JOIN student_grade sg
                 ON sg.class_id = cl.Class_id
-               AND sg.student_id = sc.student_id
+               AND sg.student_id = si.student_id
                AND sg.grading_period_id = ?
          LEFT JOIN grade_release r
                 ON r.grading_period_id = ?
                AND r.owner_user_id = cl.user_id
                AND r.status = 'Released'
-         WHERE sc.student_id = ?
+         WHERE si.student_id = ?
          ORDER BY s.Subject_name"
     );
     $stmt->bind_param('iii', $periodId, $periodId, $studentInfoId);

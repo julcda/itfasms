@@ -34,15 +34,16 @@ abstract class StudentLmsController extends Controller
         return $id;
     }
 
-    /** AUTHORIZATION PRIMITIVE — a class is reachable only if the student is on its roster. */
+    /** AUTHORIZATION PRIMITIVE — a class is reachable only if the student is on its
+     *  roster, derived live from section membership (student's section == class's section). */
     protected function enrolledClass(int $studentInfoId, int $classId): SchoolClass
     {
-        $onRoster = StudentClass::where('class_id', $classId)->where('student_id', $studentInfoId)->exists();
-        if (!$onRoster) {
+        $class = SchoolClass::with(['subject', 'section', 'teacher'])->findOrFail($classId);
+        if (!$class->hasStudent($studentInfoId)) {
             throw new HttpResponseException(
                 redirect()->route('student.classes.index')->with('error', 'You are not enrolled in that class.')
             );
         }
-        return SchoolClass::with(['subject', 'section', 'teacher'])->findOrFail($classId);
+        return $class;
     }
 }

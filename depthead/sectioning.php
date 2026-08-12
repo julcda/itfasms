@@ -74,6 +74,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $siStmt = $connection->prepare('UPDATE studentinfo SET Section = ? WHERE LRN_no = ? AND School_year_id = ?');
                 $siStmt->bind_param('isi', $newSectionId, $lrnDigits, $syId);
                 $siStmt->execute();
+
+                // Re-enrol the student into the NEW section's classes. Teacher
+                // rosters and grading read student_classes (not the section
+                // label), so without this the transfer never reaches the
+                // teachers' accounts.
+                $siIdStmt = $connection->prepare('SELECT student_id FROM studentinfo WHERE LRN_no = ? AND School_year_id = ? LIMIT 1');
+                $siIdStmt->bind_param('si', $lrnDigits, $syId);
+                $siIdStmt->execute();
+                $siId = (int) (stmt_fetch_assoc($siIdStmt)['student_id'] ?? 0);
+                if ($siId > 0) {
+                    // drop stale class links for this school year
+                    $delStmt = $connection->prepare(
+                        'DELETE sc FROM student_classes sc
+                           JOIN classes c ON c.Class_id = sc.class_id
+                          WHERE sc.student_id = ? AND c.School_year_id = ?'
+                    );
+                    $delStmt->bind_param('ii', $siId, $syId);
+                    $delStmt->execute();
+                    // enrol into every class of the new section for this year
+                    $insStmt = $connection->prepare(
+                        'INSERT INTO student_classes (class_id, student_id)
+                         SELECT c.Class_id, ? FROM classes c
+                          WHERE c.Section_id = ? AND c.School_year_id = ?
+                            AND NOT EXISTS (SELECT 1 FROM student_classes s2
+                                            WHERE s2.student_id = ? AND s2.class_id = c.Class_id)'
+                    );
+                    $insStmt->bind_param('iiii', $siId, $newSectionId, $syId, $siId);
+                    $insStmt->execute();
+                }
             }
         } catch (Throwable) {}
 

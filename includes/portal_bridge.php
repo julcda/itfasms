@@ -19,10 +19,21 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config/database.php';
 
-/** Base URL of the Laravel Classroom app. Override via env for deployment. */
+/**
+ * Base URL of the Laravel Classroom app. Override for deployment via ANY of
+ * (checked in order):
+ *   1. a real environment variable  CLASSROOM_PORTAL_URL
+ *   2. an Apache/LiteSpeed SetEnv    (exposed through $_SERVER)
+ *   3. a PHP constant                define('CLASSROOM_PORTAL_URL', '…')
+ * Falls back to the local dev server so nothing changes for local work.
+ */
 function classroom_portal_url(): string
 {
-    $url = getenv('CLASSROOM_PORTAL_URL') ?: 'http://127.0.0.1:8000';
+    $url = getenv('CLASSROOM_PORTAL_URL')
+        ?: (string) ($_SERVER['CLASSROOM_PORTAL_URL'] ?? '')
+        ?: (defined('CLASSROOM_PORTAL_URL') ? (string) CLASSROOM_PORTAL_URL : '')
+        ?: 'http://127.0.0.1:8000';
+
     return rtrim($url, '/');
 }
 

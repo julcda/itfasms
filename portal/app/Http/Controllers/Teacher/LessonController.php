@@ -8,6 +8,7 @@ use App\Models\Classroom\Lesson;
 use App\Models\Classroom\LessonResource;
 use App\Models\Classroom\Notification;
 use App\Models\Legacy\GradingPeriod;
+use App\Models\Legacy\SchoolClass;
 use App\Models\Legacy\StudentClass;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -155,7 +156,7 @@ class LessonController extends TeacherController
         if (!$resource->file_path) {
             return;
         }
-        $full = rtrim((string) config('portal.uploads_path'), '/\\') . '/' . $resource->file_path;
+        $full = rtrim((string) config('portal.lms_uploads_path'), '/\\') . '/' . $resource->file_path;
         if (is_file($full)) {
             @unlink($full);
         }
@@ -164,7 +165,7 @@ class LessonController extends TeacherController
     /** Fan-out a "new lesson published" notification to every enrolled student. */
     private function notifyPublished(Lesson $lesson, int $classId): void
     {
-        $studentIds = StudentClass::where('class_id', $classId)->pluck('student_id')->filter()->values();
+        $studentIds = SchoolClass::rosterIdsFor($classId)->filter()->values();
         if ($studentIds->isEmpty()) {
             return;
         }

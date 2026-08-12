@@ -18,12 +18,15 @@
         <div class="absolute -top-16 -right-10 w-48 h-48 rounded-full bg-emerald-400/20 blur-3xl pointer-events-none"></div>
         <div class="relative flex items-center gap-3 mb-9">
             <div class="w-10 h-10 rounded-2xl bg-white/10 ring-1 ring-white/15 flex items-center justify-center">
-                <img src="{{ rtrim(config('portal.app_base_url'), '/') }}/itfalogo.png" alt="" class="w-7 h-7 object-contain" onerror="this.style.display='none'">
+                <img src="/itfalogo.png" alt="" class="w-7 h-7 object-contain" onerror="this.style.display='none'">
             </div>
             <div>
                 <p class="text-[10px] uppercase tracking-[0.2em] text-gold-300 font-bold">ITFA System</p>
                 <p class="text-base font-extrabold leading-tight font-display">Classroom</p>
             </div>
+            <button @click="nav = false" class="lg:hidden ml-auto -mr-1 w-9 h-9 rounded-lg text-emerald-50/80 hover:bg-white/10 flex items-center justify-center" aria-label="Close menu">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
         </div>
 
         <nav class="relative space-y-1 flex-1">

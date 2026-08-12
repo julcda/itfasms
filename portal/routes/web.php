@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\Admin;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\DashboardController;
@@ -18,6 +19,36 @@ Route::match(['get', 'post'], '/logout', [AuthController::class, 'logout'])->nam
 
 // ── SSO handoff from the native teacher session ──────────────────────────────
 Route::get('/sso/teacher/{ticket}', [Teacher\SsoController::class, 'consume'])->name('teacher.sso');
+
+// ── Super Admin maintenance console ──────────────────────────────────────────
+Route::prefix('admin')->name('admin.')->group(function () {
+    Route::get('/login', [Admin\AuthController::class, 'show'])->name('login');
+    Route::post('/login', [Admin\AuthController::class, 'login'])->name('login.attempt');
+    Route::match(['get', 'post'], '/logout', [Admin\AuthController::class, 'logout'])->name('logout');
+
+    Route::middleware('admin')->group(function () {
+        Route::get('/', [Admin\DashboardController::class, 'index'])->name('dashboard');
+
+        // Student portal accounts
+        Route::get('/students', [Admin\StudentAccountController::class, 'index'])->name('students');
+        Route::post('/students/{id}/reset', [Admin\StudentAccountController::class, 'resetPassword'])->name('students.reset');
+        Route::post('/students/{id}/status', [Admin\StudentAccountController::class, 'toggleStatus'])->name('students.status');
+        Route::post('/students/bulk-reset', [Admin\StudentAccountController::class, 'bulkReset'])->name('students.bulk-reset');
+
+        // Access monitoring
+        Route::get('/monitoring', [Admin\MonitoringController::class, 'index'])->name('monitoring');
+
+        // Backups
+        Route::get('/backups', [Admin\BackupController::class, 'index'])->name('backups');
+        Route::post('/backups/run', [Admin\BackupController::class, 'run'])->name('backups.run');
+        Route::get('/backups/{name}/download', [Admin\BackupController::class, 'download'])->name('backups.download');
+        Route::delete('/backups/{name}', [Admin\BackupController::class, 'destroy'])->name('backups.destroy');
+
+        // Maintenance / system
+        Route::get('/maintenance', [Admin\MaintenanceController::class, 'index'])->name('maintenance');
+        Route::post('/maintenance/clear-cache', [Admin\MaintenanceController::class, 'clearCache'])->name('maintenance.clear-cache');
+    });
+});
 
 // ── Password change (reachable while must_change_password is set) ─────────────
 Route::middleware('student:allow-pw-change')->group(function () {

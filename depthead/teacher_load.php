@@ -15,6 +15,59 @@ if (!is_depthead_user($user) && !is_depthead_admin($user) && !is_super_admin($us
     redirect_to(app_url('login.php'));
 }
 
+// Only Admin (principal) and Super Admin may EDIT loads; dept heads keep read-only.
+$canManageLoads = is_depthead_admin($user) || is_super_admin($user);
+
+// ── POST: reassign teacher / edit time / remove a class from a load ───────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $ctxTeacher = to_int($_POST['ctx_teacher'] ?? 0);
+    $return     = 'teacher_load.php' . ($ctxTeacher > 0 ? '?teacher_id=' . $ctxTeacher : '');
+
+    if (!verify_csrf_token($_POST['csrf_token'] ?? null)) {
+        flash_set('error', 'Security token mismatch. Please try again.');
+        redirect_to($return);
+    }
+    if (!$canManageLoads) {
+        flash_set('error', 'Only Admin or Super Admin can modify teaching loads.');
+        redirect_to($return);
+    }
+
+    $action  = trim((string) ($_POST['action'] ?? ''));
+    $classId = to_int($_POST['class_id'] ?? 0);
+
+    try {
+        if ($classId <= 0) {
+            throw new RuntimeException('Invalid class record.');
+        }
+        if ($action === 'update_row') {
+            $newTeacherId = to_int($_POST['teacher_id'] ?? 0);
+            $time         = trim((string) ($_POST['time'] ?? ''));
+            if ($newTeacherId <= 0) {
+                throw new RuntimeException('Please choose a teacher.');
+            }
+            if ($time === '') {
+                throw new RuntimeException('Please enter a time slot.');
+            }
+            $st = $connection->prepare('UPDATE classes SET Teacher_id = ?, Time = ? WHERE Class_id = ?');
+            $st->bind_param('isi', $newTeacherId, $time, $classId);
+            $st->execute();
+            flash_set('success', ($newTeacherId !== $ctxTeacher)
+                ? 'Class reassigned to another teacher.'
+                : 'Class time updated.');
+        } elseif ($action === 'remove') {
+            $st = $connection->prepare('DELETE FROM classes WHERE Class_id = ?');
+            $st->bind_param('i', $classId);
+            $st->execute();
+            flash_set('success', 'Class removed from the teaching load.');
+        } else {
+            throw new RuntimeException('Unknown action.');
+        }
+    } catch (Throwable $e) {
+        flash_set('error', $e->getMessage());
+    }
+    redirect_to($return);
+}
+
 // ── Active school year ────────────────────────────────────────────────────────
 $activeSchoolYearLabel = '';
 $activeSchoolYearId    = 0;
@@ -124,6 +177,8 @@ $logoUrl  = h(app_url('itfalogo.png'));
 $backUrl  = h(app_url('depthead/index.php'));
 $printDate = date('F d, Y');
 $printTime = date('h:i A');
+$csrf  = csrf_token();
+$flash = flash_get();
 ?>
 <!doctype html>
 <html lang="en">
@@ -366,10 +421,32 @@ $printTime = date('h:i A');
         }
         .empty-block strong { display: block; font-size: 15px; color: #64748b; margin-bottom: 6px; }
 
+        /* ── Manage controls (screen only) ── */
+        .flash-banner { max-width: 820px; margin: 14px auto 0; padding: 0 16px; }
+        .flash-inner { border-radius: 12px; padding: 11px 16px; font-size: 12px; font-weight: 600; }
+        .flash-success { background: #ecfdf5; border: 1px solid #6ee7b7; color: #065f46; }
+        .flash-error   { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
+        .manage-hint { font-size: 11px; color: #64748b; font-weight: 600; }
+        .manage-cell { vertical-align: middle; }
+        .manage-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+        .manage-form select, .manage-form input {
+            padding: 5px 7px; border: 1px solid #cbd5e1; border-radius: 8px;
+            font-size: 11px; font-family: inherit; background: #fff;
+        }
+        .manage-form .t-sel  { width: 128px; }
+        .manage-form .t-time { width: 96px; }
+        .btn-save-row { background: #166534; color: #fff; border: none; border-radius: 8px;
+            padding: 6px 11px; font-size: 11px; font-weight: 700; cursor: pointer; }
+        .btn-save-row:hover { background: #0f4d28; }
+        .btn-del-row { background: #fff; color: #dc2626; border: 1px solid #fca5a5;
+            border-radius: 8px; padding: 6px 10px; font-size: 11px; font-weight: 700; cursor: pointer; margin-left: 6px; }
+        .btn-del-row:hover { background: #fef2f2; }
+
         /* ── Print ── */
         @media print {
             body { background: #fff; }
-            .toolbar, .selector-bar { display: none !important; }
+            .toolbar, .selector-bar, .flash-banner, .no-print,
+            .manage-col, .manage-cell { display: none !important; }
             .sheet-wrap { margin: 0; padding: 0; max-width: none; }
             .sheet { box-shadow: none; border-radius: 0; }
             .content { padding: 20px 24px; }
@@ -422,6 +499,12 @@ $printTime = date('h:i A');
         </div>
     </form>
 </div>
+
+<?php if ($flash): ?>
+<div class="flash-banner">
+    <div class="flash-inner <?= ($flash['type'] ?? '') === 'success' ? 'flash-success' : 'flash-error' ?>"><?= h((string) $flash['message']) ?></div>
+</div>
+<?php endif; ?>
 
 <!-- ── Sheet ──────────────────────────────────────────────────────────────── -->
 <div class="sheet-wrap">
@@ -481,6 +564,12 @@ $printTime = date('h:i A');
             </div>
         </div>
 
+        <?php if ($canManageLoads): ?>
+        <p class="manage-hint no-print" style="margin:2px 2px 10px">
+            ✎ Admin mode — use the <b>Manage</b> column to reassign a class to another teacher, edit its time, or remove it from this load. Changes are hidden when printing.
+        </p>
+        <?php endif; ?>
+
         <!-- Schedule grouped by semester then section -->
         <?php foreach ($bySemester as $semKey => $semData): ?>
             <div class="sem-heading"><?= h($semData['label']) ?></div>
@@ -506,6 +595,9 @@ $printTime = date('h:i A');
                                 <th>Subject</th>
                                 <th class="code-col">Code</th>
                                 <th style="width:65px;text-align:center">Status</th>
+                                <?php if ($canManageLoads): ?>
+                                <th class="manage-col" style="width:250px">Manage</th>
+                                <?php endif; ?>
                             </tr>
                         </thead>
                         <tbody>
@@ -533,6 +625,34 @@ $printTime = date('h:i A');
                                         <span class="status-inactive">Inactive</span>
                                     <?php endif; ?>
                                 </td>
+                                <?php if ($canManageLoads): ?>
+                                <td class="manage-cell manage-col">
+                                    <div class="manage-form">
+                                        <form method="POST" class="manage-form" style="gap:6px">
+                                            <input type="hidden" name="csrf_token" value="<?= h($csrf) ?>">
+                                            <input type="hidden" name="ctx_teacher" value="<?= (int) $teacherId ?>">
+                                            <input type="hidden" name="class_id" value="<?= (int) ($row['Class_id'] ?? 0) ?>">
+                                            <input type="hidden" name="action" value="update_row">
+                                            <select name="teacher_id" class="t-sel" title="Reassign to teacher">
+                                                <?php foreach ($teachers as $tt): ?>
+                                                <option value="<?= (int) $tt['Teacher_id'] ?>" <?= (int) $tt['Teacher_id'] === $teacherId ? 'selected' : '' ?>>
+                                                    <?= h((string) $tt['Fullname']) ?>
+                                                </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                            <input type="text" name="time" class="t-time" value="<?= h($rawTime) ?>" title="Time slot" placeholder="e.g. 8:00-9:00">
+                                            <button type="submit" class="btn-save-row">Save</button>
+                                        </form>
+                                        <form method="POST" onsubmit="return confirm('Remove this class from the load? This deletes the class record.');" style="display:inline">
+                                            <input type="hidden" name="csrf_token" value="<?= h($csrf) ?>">
+                                            <input type="hidden" name="ctx_teacher" value="<?= (int) $teacherId ?>">
+                                            <input type="hidden" name="class_id" value="<?= (int) ($row['Class_id'] ?? 0) ?>">
+                                            <input type="hidden" name="action" value="remove">
+                                            <button type="submit" class="btn-del-row">Delete</button>
+                                        </form>
+                                    </div>
+                                </td>
+                                <?php endif; ?>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>

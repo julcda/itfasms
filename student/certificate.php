@@ -69,10 +69,12 @@ $flash   = flash_get();
         <?php else: ?>
         <div class="grid md:grid-cols-2 gap-5">
             <?php foreach ($certs as $c):
-                $lvl  = (string) $c['honor_level'];
-                $hi   = str_contains($lvl, 'Highest');
-                $h2   = !$hi && str_contains($lvl, 'High');
-                $grad = $hi ? 'from-amber-500 to-orange-600' : ($h2 ? 'from-violet-500 to-purple-600' : 'from-sky-500 to-blue-600');
+                $lvl  = cert_display_title($c);
+                $grad = match ((string) ($c['type'] ?? '')) {
+                    'Perfect Attendance' => 'from-emerald-500 to-teal-600',
+                    'Special Award'      => 'from-violet-500 to-purple-600',
+                    default              => 'from-amber-500 to-orange-600',
+                };
             ?>
             <article class="bg-white rounded-3xl border border-green-100 shadow-panel overflow-hidden">
                 <div class="bg-gradient-to-br <?= $grad ?> px-5 py-4 text-white">

@@ -9,6 +9,7 @@ use App\Models\Classroom\AssignmentAttachment;
 use App\Models\Classroom\AssignmentSubmission;
 use App\Models\Classroom\GradeIntegration;
 use App\Models\Legacy\GradingPeriod;
+use App\Models\Legacy\SchoolClass;
 use App\Models\Legacy\StudentClass;
 use App\Models\Legacy\StudentInfo;
 use App\Support\Uploads;
@@ -31,7 +32,7 @@ class AssignmentController extends TeacherController
     public function index(Request $request, int $classId)
     {
         $class = $this->ownedClass($request, $classId);
-        $rosterCount = StudentClass::where('class_id', $classId)->count();
+        $rosterCount = $class->rosterStudentIds()->count();
         $assignments = Assignment::where('class_id', $classId)
             ->withCount(['submissions as submitted_count' => fn ($q) => $q->whereIn('status', ['submitted', 'late', 'graded'])])
             ->orderByDesc('id')->get();
@@ -125,7 +126,7 @@ class AssignmentController extends TeacherController
     public function submissions(Request $request, int $id)
     {
         $assignment = $this->ownedAssignment($request, $id);
-        $roster = StudentClass::where('class_id', $assignment->class_id)->pluck('student_id')->filter()->values();
+        $roster = SchoolClass::rosterIdsFor((int) $assignment->class_id)->filter()->values();
         $students = StudentInfo::whereIn('student_id', $roster)->get()->keyBy('student_id');
         $subs = AssignmentSubmission::with('files')->where('assignment_id', $id)->get()->keyBy('student_id');
 

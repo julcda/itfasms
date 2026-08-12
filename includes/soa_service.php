@@ -830,6 +830,13 @@ function soa_create_document(
             }
         }
     }
+    // Guard: never create a blank SOA. Keep only months that exist in this
+    // student's payment schedule — enrollment-fee-only students have none, so
+    // there is nothing to bill and the caller should skip them.
+    $selectedTerms = array_values(array_filter($selectedTerms, static fn($t) => isset($schedule[$t])));
+    if ($selectedTerms === []) {
+        return 0;
+    }
     sort($selectedTerms);
 
     $totalDue = 0.0;

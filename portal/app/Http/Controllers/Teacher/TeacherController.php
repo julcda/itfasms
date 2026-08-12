@@ -63,7 +63,7 @@ abstract class TeacherController extends Controller
     /** Fan a notification out to every enrolled student of a class. */
     protected function notifyClass(int $classId, string $type, string $title, ?string $body, string $link, array $data = []): void
     {
-        $studentIds = StudentClass::where('class_id', $classId)->pluck('student_id')->filter()->unique()->values();
+        $studentIds = SchoolClass::rosterIdsFor($classId)->filter()->unique()->values();
         if ($studentIds->isEmpty()) {
             return;
         }

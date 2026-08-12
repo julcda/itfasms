@@ -156,21 +156,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'gener
             }
             // Never re-generate a month that already has an SOA document.
             $generated = soa_generated_terms($connection, $assessmentId);
+            $schedule  = soa_get_schedule($connection, $assessmentId);
             if ($terms !== []) {
+                // Only bill selected months that (a) aren't already generated
+                // and (b) actually exist in this student's payment schedule.
+                // Enrollment-fee-only students have no schedule, so there is
+                // nothing to bill — skip them instead of emitting a blank ₱0
+                // slip (which also spawned endless duplicate docs on re-runs).
                 $want = array_values(array_diff($terms, $generated));
+                $want = array_values(array_filter($want, static fn($t) => isset($schedule[$t])));
             } else {
                 // Default = unpaid months, minus any already generated.
                 $unpaid = [];
-                foreach (soa_get_schedule($connection, $assessmentId) as $tno => $row) {
+                foreach ($schedule as $tno => $row) {
                     if ($row['balance'] > 0) { $unpaid[] = $tno; }
                 }
                 $want = array_values(array_diff($unpaid, $generated));
             }
             if ($want === []) {
-                $skippedStudents++; // all requested months already generated
+                $skippedStudents++; // nothing billable for the selected month(s)
                 continue;
             }
-            $soaIds[] = soa_create_document(
+            $newSoaId = soa_create_document(
                 $connection,
                 $assessmentId,
                 $en['student_id'],
@@ -182,6 +189,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'gener
                 $cashierName,
                 $batchId
             );
+            if ($newSoaId > 0) {
+                $soaIds[] = $newSoaId;
+            } else {
+                $skippedStudents++; // defensive: nothing billable, no doc created
+            }
         }
         $connection->commit();
     } catch (Throwable $e) {

@@ -9,18 +9,22 @@
     $sbName     = trim(($profile->firstname ?? '') . ' ' . ($profile->surname ?? '')) ?: 'Student';
     $sbInitials = strtoupper(substr($profile->firstname ?? 'S', 0, 1) . substr($profile->surname ?? '', 0, 1));
 @endphp
-<aside class="text-slate-100 flex flex-col p-6 lg:m-3 lg:rounded-3xl overflow-hidden relative"
-       style="background:linear-gradient(160deg,#0f5a30 0%,#0a3a1e 55%,#04240f 100%)">
+<aside x-cloak :class="nav ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
+       class="fixed lg:static inset-y-0 left-0 z-40 w-[280px] text-slate-100 flex flex-col p-6 transition-transform duration-300 lg:m-3 lg:rounded-3xl overflow-hidden"
+       style="background:linear-gradient(160deg,#0f5a30 0%,#0a3a1e 55%,#04240f 100%)" aria-label="Portal navigation">
     <div class="absolute -top-16 -right-12 w-52 h-52 rounded-full bg-emerald-400/20 blur-3xl pointer-events-none"></div>
 
     <div class="relative flex items-center gap-3 mb-9">
         <div class="w-10 h-10 rounded-2xl bg-white/10 ring-1 ring-white/15 flex items-center justify-center">
-            <img src="{{ rtrim(config('portal.app_base_url'), '/') }}/itfalogo.png" alt="" class="w-7 h-7 object-contain" onerror="this.style.display='none'">
+            <img src="/itfalogo.png" alt="" class="w-7 h-7 object-contain" onerror="this.style.display='none'">
         </div>
         <div>
             <p class="text-[10px] uppercase tracking-[0.2em] text-gold-300 font-bold">ITFA System</p>
             <p class="text-base font-extrabold leading-tight font-display">Student Portal</p>
         </div>
+        <button @click="nav = false" class="lg:hidden ml-auto -mr-1 w-9 h-9 rounded-lg text-emerald-50/80 hover:bg-white/10 flex items-center justify-center" aria-label="Close menu">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
     </div>
 
     <nav class="relative space-y-1 flex-1">

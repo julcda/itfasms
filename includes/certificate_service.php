@@ -19,33 +19,44 @@ require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/soa_service.php';
 require_once __DIR__ . '/grading_service.php';
 
-/** Honor bands (DepEd). Highest first — first match wins. */
-function cert_honor_bands(): array
+/** Minimum general average that qualifies for the Academic Excellence Award. */
+const CERT_ACADEMIC_MIN = 90.0;
+
+/**
+ * The award types a certificate can be. Each is its OWN certificate; a student
+ * may receive any combination. The value is the default printed title (the
+ * Special Award title is supplied per-issue).
+ */
+function cert_award_types(): array
 {
     return [
-        ['level' => 'With Highest Honors', 'min' => 98.0, 'max' => 100.0],
-        ['level' => 'With High Honors',    'min' => 95.0, 'max' => 97.99],
-        ['level' => 'With Honors',         'min' => 90.0, 'max' => 94.99],
+        'Academic Excellence' => 'Academic Excellence Award',
+        'Perfect Attendance'  => 'Perfect Attendance Award',
+        'Special Award'       => '',
     ];
 }
 
-/** The honor level an average qualifies for, or null. */
-function cert_honor_for(?float $avg): ?string
+/** Does this average qualify for the Academic Excellence Award? */
+function cert_is_honor(?float $avg): bool
 {
-    if ($avg === null) {
-        return null;
-    }
-    foreach (cert_honor_bands() as $b) {
-        if ($avg >= $b['min']) {
-            return $b['level'];
-        }
-    }
-    return null;
+    return $avg !== null && $avg >= CERT_ACADEMIC_MIN;
 }
 
-function cert_levels(): array
+/**
+ * The title to print for a stored certificate: the new award_title, falling
+ * back to the legacy honor band, then the type. Keeps old certificates valid.
+ */
+function cert_display_title(array $cert): string
 {
-    return array_column(cert_honor_bands(), 'level');
+    $title = trim((string) ($cert['award_title'] ?? ''));
+    if ($title !== '') {
+        return $title;
+    }
+    $legacy = trim((string) ($cert['honor_level'] ?? ''));
+    if ($legacy !== '') {
+        return $legacy;
+    }
+    return (string) ($cert['type'] ?? 'Certificate');
 }
 
 function cert_schema_ready(mysqli $db): bool
@@ -86,8 +97,7 @@ function cert_advisory_students(mysqli $db, int $sectionId, int $syId, int $peri
                                THEN sg.grade END), 2) AS average,
                 COUNT(CASE WHEN sg.status IN ('Approved','Locked') AND sg.grade IS NOT NULL
                            THEN 1 END) AS graded_subjects,
-                COUNT(DISTINCT sc.class_id) AS total_subjects,
-                c.id AS cert_id, c.certificate_no, c.honor_level AS cert_level, c.status AS cert_status
+                COUNT(DISTINCT sc.class_id) AS total_subjects
          FROM studentinfo si
          JOIN student_classes sc ON sc.student_id = si.student_id
          JOIN classes cl         ON cl.Class_id = sc.class_id AND cl.School_year_id = ?
@@ -96,10 +106,6 @@ function cert_advisory_students(mysqli $db, int $sectionId, int $syId, int $peri
                                    AND sg.grading_period_id = ?
          LEFT JOIN gradelevel gl ON gl.Gradelevel_id = si.Gradelevel
          LEFT JOIN section sec   ON sec.Section_id = si.Section
-         LEFT JOIN certificate c ON c.student_id = si.student_id
-                                AND c.school_year_id = ?
-                                AND c.grading_period_id = ?
-                                AND c.type = 'Academic Honor'
          WHERE si.Section = ? AND si.School_year_id = ?
          GROUP BY si.student_id
          -- MariaDB rejects an aggregate ALIAS in ORDER BY ('reference to group
@@ -110,20 +116,47 @@ function cert_advisory_students(mysqli $db, int $sectionId, int $syId, int $peri
                            THEN sg.grade END) DESC,
                   si.Lastname"
     );
-    $stmt->bind_param('iiiiii', $syId, $periodId, $syId, $periodId, $sectionId, $syId);
+    $stmt->bind_param('iiii', $syId, $periodId, $sectionId, $syId);
     $stmt->execute();
     $rows = stmt_fetch_all_assoc($stmt);
+
+    // Any award already on file for this section+period, keyed by student+type.
+    $certs = cert_map_for_period($db, $sectionId, $syId, $periodId);
 
     foreach ($rows as &$r) {
         $avg = $r['average'] !== null ? (float) $r['average'] : null;
         $r['average']    = $avg;
-        $r['suggested']  = cert_honor_for($avg);
+        $r['is_honor']   = cert_is_honor($avg);
         $r['full_name']  = trim((string) $r['Lastname'] . ', ' . (string) $r['Firstname']
                          . ((string) ($r['Middlename'] ?? '') !== '' ? ' ' . mb_substr((string) $r['Middlename'], 0, 1) . '.' : ''));
         $r['complete']   = (int) $r['graded_subjects'] > 0
                         && (int) $r['graded_subjects'] === (int) $r['total_subjects'];
+        // certs[type] => row|null for each award type
+        $r['certs'] = [];
+        foreach (array_keys(cert_award_types()) as $type) {
+            $r['certs'][$type] = $certs[(int) $r['student_id']][$type] ?? null;
+        }
     }
     return $rows;
+}
+
+/** student_id => [type => certificate row] for a section's period. */
+function cert_map_for_period(mysqli $db, int $sectionId, int $syId, int $periodId): array
+{
+    $pid = $periodId ?: null;
+    $stmt = $db->prepare(
+        "SELECT c.id, c.student_id, c.type, c.award_title, c.honor_level, c.status, c.certificate_no
+         FROM certificate c
+         JOIN studentinfo si ON si.student_id = c.student_id
+         WHERE si.Section = ? AND c.school_year_id = ? AND (c.grading_period_id <=> ?)"
+    );
+    $stmt->bind_param('iii', $sectionId, $syId, $pid);
+    $stmt->execute();
+    $map = [];
+    foreach (stmt_fetch_all_assoc($stmt) as $c) {
+        $map[(int) $c['student_id']][(string) $c['type']] = $c;
+    }
+    return $map;
 }
 
 /**
@@ -136,28 +169,42 @@ function cert_issue(mysqli $db, array $d, array $user): int
         throw new RuntimeException('Run migrations/certificates.sql first.');
     }
     $studentId = (int) ($d['student_id'] ?? 0);
-    $level     = (string) ($d['honor_level'] ?? '');
+    $type      = (string) ($d['type'] ?? '');
     $syId      = (int) ($d['school_year_id'] ?? 0);
     $periodId  = (int) ($d['grading_period_id'] ?? 0) ?: null;
 
     if ($studentId <= 0 || $syId <= 0) {
         throw new RuntimeException('Invalid student or school year.');
     }
-    if (!in_array($level, cert_levels(), true)) {
-        throw new RuntimeException('Choose a valid honor level.');
+    $awardTypes = cert_award_types();
+    if (!array_key_exists($type, $awardTypes)) {
+        throw new RuntimeException('Choose a valid award type.');
     }
 
-    // Block silent overwrite of something already signed and published.
+    // Resolve the printed award title. The Special Award title is free text.
+    if ($type === 'Special Award') {
+        $awardTitle = trim((string) ($d['award_title'] ?? ''));
+        if ($awardTitle === '') {
+            throw new RuntimeException('Enter the title of the Special Award.');
+        }
+    } else {
+        $awardTitle = $awardTypes[$type];
+    }
+    // Only the Academic Excellence Award carries a general average.
+    $avg = ($type === 'Academic Excellence' && isset($d['general_average']) && $d['general_average'] !== null)
+        ? (float) $d['general_average'] : null;
+
+    // Block silent overwrite of something already signed and published (per type).
     $ex = $db->prepare(
         "SELECT id, status FROM certificate
-         WHERE student_id = ? AND school_year_id = ? AND type = 'Academic Honor'
+         WHERE student_id = ? AND school_year_id = ? AND type = ?
            AND (grading_period_id <=> ?) LIMIT 1"
     );
-    $ex->bind_param('iii', $studentId, $syId, $periodId);
+    $ex->bind_param('iisi', $studentId, $syId, $type, $periodId);
     $ex->execute();
     $existing = stmt_fetch_assoc($ex);
     if ($existing && (string) $existing['status'] === 'Published') {
-        throw new RuntimeException('A published certificate already exists for this student and period. Revoke it first to change it.');
+        throw new RuntimeException('A published ' . $type . ' certificate already exists for this student and period. Revoke it first to change it.');
     }
 
     $name    = (string) ($d['student_name'] ?? '');
@@ -166,7 +213,6 @@ function cert_issue(mysqli $db, array $d, array $user): int
     $section = (string) ($d['section_name'] ?? '') ?: null;
     $syLabel = (string) ($d['school_year'] ?? '') ?: null;
     $pName   = (string) ($d['period_name'] ?? '') ?: null;
-    $avg     = isset($d['general_average']) && $d['general_average'] !== null ? (float) $d['general_average'] : null;
     $advId   = (int) ($d['adviser_teacher_id'] ?? 0) ?: null;
     $advName = (string) ($d['adviser_name'] ?? '') ?: null;
     $princ   = soa_setting($db, 'PRINCIPAL_NAME', 'MUJAHIDIN I. GARAY, LPT, MAEd');
@@ -177,15 +223,15 @@ function cert_issue(mysqli $db, array $d, array $user): int
         if ($existing) {
             $stmt = $db->prepare(
                 "UPDATE certificate
-                    SET honor_level = ?, general_average = ?, student_name = ?, lrn = ?,
+                    SET award_title = ?, honor_level = NULL, general_average = ?, student_name = ?, lrn = ?,
                         grade_level = ?, section_name = ?, school_year = ?, period_name = ?,
                         adviser_teacher_id = ?, adviser_name = ?, principal_name = ?,
                         status = 'Draft', issued_by = ?
                   WHERE id = ?"
             );
             $id = (int) $existing['id'];
-            // level,avg,name,lrn,grade,section,syLabel,pName,advId,advName,princ,issuedBy,id
-            $stmt->bind_param('sdssssssissii', $level, $avg, $name, $lrn, $grade, $section,
+            // title,avg,name,lrn,grade,section,syLabel,pName,advId,advName,princ,issuedBy,id
+            $stmt->bind_param('sdssssssissii', $awardTitle, $avg, $name, $lrn, $grade, $section,
                 $syLabel, $pName, $advId, $advName, $princ, $issuedBy, $id);
             $stmt->execute();
         } else {
@@ -197,16 +243,16 @@ function cert_issue(mysqli $db, array $d, array $user): int
                 "INSERT INTO certificate
                     (certificate_no, verify_token, type, student_id, student_name, lrn,
                      grade_level, section_name, school_year_id, school_year,
-                     grading_period_id, period_name, honor_level, general_average,
+                     grading_period_id, period_name, award_title, general_average,
                      adviser_teacher_id, adviser_name, principal_name, status, issued_by)
-                 VALUES (?, ?, 'Academic Honor', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Draft', ?)"
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Draft', ?)"
             );
-            // certNo,token,studentId,name,lrn,grade,section,syId,syLabel,periodId,
-            // pName,level,avg,advId,advName,princ,issuedBy  = 17 params
+            // certNo,token,type,studentId,name,lrn,grade,section,syId,syLabel,periodId,
+            // pName,title,avg,advId,advName,princ,issuedBy  = 18 params
             $stmt->bind_param(
-                'ssissssisissdissi',
-                $certNo, $token, $studentId, $name, $lrn, $grade, $section,
-                $syId, $syLabel, $periodId, $pName, $level, $avg, $advId, $advName, $princ, $issuedBy
+                'sssissssisissdissi',
+                $certNo, $token, $type, $studentId, $name, $lrn, $grade, $section,
+                $syId, $syLabel, $periodId, $pName, $awardTitle, $avg, $advId, $advName, $princ, $issuedBy
             );
             $stmt->execute();
             $id = (int) $db->insert_id;
@@ -214,7 +260,7 @@ function cert_issue(mysqli $db, array $d, array $user): int
 
         soa_audit($db, $issuedBy, (string) ($user['full_name'] ?? 'Adviser'),
             'CERT_ISSUE', 'certificate', (string) $id, null,
-            json_encode(['student' => $name, 'level' => $level, 'average' => $avg]));
+            json_encode(['student' => $name, 'type' => $type, 'award' => $awardTitle, 'average' => $avg]));
 
         $db->commit();
         return $id;
@@ -252,6 +298,42 @@ function cert_publish_period(mysqli $db, int $syId, ?int $periodId, array $user)
     if ($n > 0) {
         soa_audit($db, $uid, $name, 'CERT_PUBLISH', 'certificate', 'period:' . ($periodId ?? 'SY'), null,
             json_encode(['published' => $n]));
+    }
+    return $n;
+}
+
+/**
+ * Publish (approve) every draft certificate for ONE section in a period.
+ * Approval is done per section — the head signs off a whole class at once.
+ */
+function cert_publish_section(mysqli $db, int $sectionId, int $syId, ?int $periodId, array $user): int
+{
+    $uid  = (int) ($user['id'] ?? 0);
+    $name = (string) ($user['full_name'] ?? 'Department Head');
+
+    $sql = "UPDATE certificate c
+            JOIN studentinfo si ON si.student_id = c.student_id
+            SET c.status = 'Published', c.published_by = ?, c.published_by_name = ?, c.published_at = NOW()
+            WHERE c.status = 'Draft' AND c.school_year_id = ? AND (c.grading_period_id <=> ?)
+              AND si.Section = ?";
+    if (!is_super_admin($user)) {
+        $sql .= " AND EXISTS (SELECT 1 FROM student_classes sc
+                              JOIN classes cl ON cl.Class_id = sc.class_id
+                              WHERE sc.student_id = c.student_id AND cl.user_id = ?
+                                AND cl.School_year_id = c.school_year_id)";
+    }
+    $stmt = $db->prepare($sql);
+    if (is_super_admin($user)) {
+        $stmt->bind_param('isiii', $uid, $name, $syId, $periodId, $sectionId);
+    } else {
+        $stmt->bind_param('isiiii', $uid, $name, $syId, $periodId, $sectionId, $uid);
+    }
+    $stmt->execute();
+    $n = $db->affected_rows;
+
+    if ($n > 0) {
+        soa_audit($db, $uid, $name, 'CERT_PUBLISH', 'certificate', 'section:' . $sectionId, null,
+            json_encode(['published' => $n, 'period' => $periodId]));
     }
     return $n;
 }
@@ -331,9 +413,10 @@ function cert_for_student(mysqli $db, int $studentInfoId): array
 /** All certificates for the head's review screen. */
 function cert_list(mysqli $db, int $syId, ?int $periodId, array $user, string $status = ''): array
 {
-    $sql = "SELECT c.*, t.Fullname AS adviser_full
+    $sql = "SELECT c.*, t.Fullname AS adviser_full, si.Section AS section_id
             FROM certificate c
-            LEFT JOIN teacher t ON t.Teacher_id = c.adviser_teacher_id
+            LEFT JOIN teacher t     ON t.Teacher_id = c.adviser_teacher_id
+            LEFT JOIN studentinfo si ON si.student_id = c.student_id
             WHERE c.school_year_id = ?";
     $types = 'i'; $params = [$syId];
 
@@ -347,7 +430,8 @@ function cert_list(mysqli $db, int $syId, ?int $periodId, array $user, string $s
                                 AND cl.School_year_id = c.school_year_id)";
         $types .= 'i'; $params[] = (int) ($user['id'] ?? 0);
     }
-    $sql .= " ORDER BY FIELD(c.status,'Draft','Published','Revoked'), c.honor_level, c.student_name";
+    $sql .= " ORDER BY si.Section, c.student_name,
+              FIELD(c.status,'Draft','Published','Revoked'), c.type";
 
     $stmt = $db->prepare($sql);
     bind_dynamic_params($stmt, $types, $params);
@@ -355,15 +439,25 @@ function cert_list(mysqli $db, int $syId, ?int $periodId, array $user, string $s
     return stmt_fetch_all_assoc($stmt);
 }
 
-/** Badge classes per honor level. */
-function cert_level_badge(string $level): string
+/** Badge classes per award type (falls back for legacy honor bands). */
+function cert_type_badge(string $type): string
 {
-    return match ($level) {
+    return match ($type) {
+        'Academic Excellence' => 'bg-amber-100 text-amber-900 border-amber-400',
+        'Perfect Attendance'  => 'bg-emerald-100 text-emerald-800 border-emerald-300',
+        'Special Award'       => 'bg-violet-100 text-violet-800 border-violet-300',
+        // legacy honor bands
         'With Highest Honors' => 'bg-amber-100 text-amber-900 border-amber-400',
         'With High Honors'    => 'bg-violet-100 text-violet-800 border-violet-300',
         'With Honors'         => 'bg-sky-100 text-sky-800 border-sky-300',
         default               => 'bg-slate-100 text-slate-700 border-slate-300',
     };
+}
+
+/** BC alias — old callers referenced cert_level_badge(). */
+function cert_level_badge(string $level): string
+{
+    return cert_type_badge($level);
 }
 
 function cert_status_badge(string $status): string

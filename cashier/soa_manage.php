@@ -29,6 +29,26 @@ try {
     if ($r) { while ($x = $r->fetch_assoc()) { $allSY[(int) $x['School_year_id']] = (string) $x['School_year']; } }
 } catch (Throwable) {}
 
+// ── Grade levels & sections (filter dropdowns) ────────────────────────────────
+$allGrades = [];
+try {
+    $r = $connection->query('SELECT Gradelevel_id, Gradelevel FROM gradelevel ORDER BY Gradelevel');
+    if ($r) { while ($x = $r->fetch_assoc()) { $allGrades[(int) $x['Gradelevel_id']] = trim((string) $x['Gradelevel']); } }
+} catch (Throwable) {}
+$allSections = [];   // [ ['id'=>Section_id, 'name'=>Section_name, 'grade'=>Gradelevel_id], … ]
+try {
+    $r = $connection->query('SELECT Section_id, Section_name, Gradelevel_id FROM section ORDER BY Section_name');
+    if ($r) { while ($x = $r->fetch_assoc()) { $allSections[] = ['id' => (string) $x['Section_id'], 'name' => (string) $x['Section_name'], 'grade' => (int) $x['Gradelevel_id']]; } }
+} catch (Throwable) {}
+
+// Month (term_no → month label), read from the real payment schedule.
+$termLabels = [];
+try {
+    $r = $connection->query('SELECT DISTINCT term_no, month_label FROM payment_schedule WHERE term_no BETWEEN 1 AND 12 ORDER BY term_no');
+    if ($r) { while ($x = $r->fetch_assoc()) { $termLabels[(int) $x['term_no']] = (string) $x['month_label']; } }
+} catch (Throwable) {}
+if ($termLabels === []) { for ($i = 1; $i <= 10; $i++) { $termLabels[$i] = ''; } }  // fallback
+
 // ── POST: delete ──────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verify_csrf_token($_POST['csrf_token'] ?? null)) {
@@ -85,6 +105,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // ── Filters ───────────────────────────────────────────────────────────────────
 $search   = trim((string) ($_GET['q'] ?? ''));
 $syFilter = isset($_GET['sy']) ? (int) $_GET['sy'] : $syId;   // 0 = all
+$gradeFilter   = (int) ($_GET['grade'] ?? 0);                 // 0 = all
+$sectionFilter = trim((string) ($_GET['section'] ?? ''));    // '' = all (Section_id)
+$monthFilter   = (int) ($_GET['month'] ?? 0);                // 0 = all; else term_no (M1..M10)
 $batch    = trim((string) ($_GET['batch'] ?? ''));
 $dateFrom = trim((string) ($_GET['from'] ?? ''));
 $dateTo   = trim((string) ($_GET['to'] ?? ''));
@@ -97,6 +120,9 @@ $where  = ['1=1'];
 $params = [];
 $types  = '';
 if ($syFilter > 0)  { $where[] = 'sa.school_year_id = ?'; $params[] = $syFilter; $types .= 'i'; }
+if ($gradeFilter > 0)   { $where[] = 'en.Department_gradelevel = ?'; $params[] = $gradeFilter;   $types .= 'i'; }
+if ($sectionFilter !== '') { $where[] = 'en.Department_section = ?'; $params[] = $sectionFilter; $types .= 's'; }
+if ($monthFilter > 0) { $where[] = 'EXISTS (SELECT 1 FROM soa_details sd WHERE sd.soa_id = sm.id AND sd.term_no = ?)'; $params[] = $monthFilter; $types .= 'i'; }
 if ($batch !== '')  { $where[] = 'sm.batch_id = ?';       $params[] = $batch;    $types .= 's'; }
 if ($dateFrom !== '') { $where[] = 'DATE(sm.generated_at) >= ?'; $params[] = $dateFrom; $types .= 's'; }
 if ($dateTo !== '')   { $where[] = 'DATE(sm.generated_at) <= ?'; $params[] = $dateTo;   $types .= 's'; }
@@ -162,7 +188,7 @@ if ($schemaReady && $batch !== '') {
 $totalPages = max(1, (int) ceil($totalRows / $perPage));
 
 // Current querystring (for redirects / pagination)
-$qsArr = array_filter(['q'=>$search, 'sy'=>$syFilter ?: '0', 'batch'=>$batch, 'from'=>$dateFrom, 'to'=>$dateTo, 'layout'=>$layout], static fn($v) => $v !== '' && $v !== null);
+$qsArr = array_filter(['q'=>$search, 'sy'=>$syFilter ?: '0', 'grade'=>$gradeFilter ?: '', 'section'=>$sectionFilter, 'month'=>$monthFilter ?: '', 'batch'=>$batch, 'from'=>$dateFrom, 'to'=>$dateTo, 'layout'=>$layout], static fn($v) => $v !== '' && $v !== null);
 $qs    = http_build_query($qsArr);
 $flash = flash_get();
 
@@ -234,6 +260,36 @@ function sm_page_url(array $base, int $pg): string
                         <option value="0">All</option>
                         <?php foreach ($allSY as $id => $lbl): ?>
                         <option value="<?= $id ?>" <?= $syFilter === $id ? 'selected' : '' ?>>S.Y. <?= h($lbl) ?><?= $id === $syId ? ' (active)' : '' ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Grade Level</label>
+                    <select name="grade" id="gradeSel" onchange="filterSections()" class="py-2 px-3 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 max-w-[170px]">
+                        <option value="0">All grades</option>
+                        <?php foreach ($allGrades as $id => $lbl): ?>
+                        <option value="<?= $id ?>" <?= $gradeFilter === $id ? 'selected' : '' ?>><?= h($lbl) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Section</label>
+                    <select name="section" id="sectionSel" class="py-2 px-3 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 max-w-[190px]">
+                        <option value="" data-grade="0">All sections</option>
+                        <?php foreach ($allSections as $sct): ?>
+                        <option value="<?= h($sct['id']) ?>" data-grade="<?= (int) $sct['grade'] ?>"
+                                <?= $sectionFilter === $sct['id'] ? 'selected' : '' ?>>
+                            <?= h($sct['name']) ?><?= isset($allGrades[$sct['grade']]) ? ' · ' . h($allGrades[$sct['grade']]) : '' ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Month</label>
+                    <select name="month" class="py-2 px-3 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 max-w-[170px]">
+                        <option value="0">All months</option>
+                        <?php foreach ($termLabels as $tno => $mlabel): ?>
+                        <option value="<?= (int) $tno ?>" <?= $monthFilter === (int) $tno ? 'selected' : '' ?>>M<?= (int) $tno ?><?= $mlabel !== '' ? ' · ' . h($mlabel) : '' ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -416,6 +472,22 @@ function deleteBatch() {
     if (!confirm('Delete the ENTIRE batch (all its SOAs, across all pages)? Assessments & payments are kept.')) return;
     document.getElementById('delBatchForm').submit();
 }
+// Show only the sections that belong to the chosen grade (keep "All sections").
+function filterSections() {
+    const grade = document.getElementById('gradeSel').value;
+    const sel   = document.getElementById('sectionSel');
+    let currentStillVisible = false;
+    Array.from(sel.options).forEach(opt => {
+        const g = opt.getAttribute('data-grade');
+        const show = (grade === '0') || (g === '0') || (g === grade);
+        opt.hidden = !show;
+        if (opt.selected && !show) { currentStillVisible = false; }
+        else if (opt.selected) { currentStillVisible = true; }
+    });
+    // If the selected section no longer belongs to the grade, reset to "All".
+    if (!currentStillVisible) { sel.value = ''; }
+}
+filterSections();  // apply on load (preserves grade/section from the querystring)
 </script>
 </body>
 </html>

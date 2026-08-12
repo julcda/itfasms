@@ -25,7 +25,7 @@ class GradebookController extends TeacherController
         $columns = $assignments->concat($quizzes)->values();
 
         // Roster.
-        $roster = StudentClass::where('class_id', $classId)->pluck('student_id')->filter()->values();
+        $roster = $class->rosterStudentIds()->filter()->values();
         $students = StudentInfo::whereIn('student_id', $roster)->get()
             ->sortBy(fn ($s) => $s->Lastname . $s->Firstname)->values();
 

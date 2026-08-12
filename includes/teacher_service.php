@@ -87,6 +87,54 @@ function teacher_advisory(mysqli $db, int $teacherId, int $syId): ?array
     return stmt_fetch_assoc($stmt);
 }
 
+/** Grade statuses an adviser is allowed to SEE — the subject teacher committed them. */
+const ADVISORY_VISIBLE_GRADE_STATUSES = ['Submitted', 'Approved', 'Locked'];
+
+/**
+ * Adviser grade-monitoring matrix for one section + grading period.
+ * Columns = the section's subject classes; grades are keyed [student_id][class_id].
+ * Only SUBMITTED grades (Submitted / Approved / Locked) are exposed — a subject
+ * teacher's drafts and returned marks stay hidden until they commit them.
+ *
+ * @return array{columns: array<int,array<string,mixed>>, grades: array<int,array<int,array{grade:mixed,status:string}>>}
+ */
+function teacher_advisory_grades(mysqli $db, int $sectionId, int $syId, int $periodId): array
+{
+    // Columns — the section's gradable subject classes (skip non-academic fillers).
+    $cStmt = $db->prepare(
+        "SELECT c.Class_id, s.Subject_name, s.subject_code
+         FROM classes c
+         JOIN subject s ON s.Subject_id = c.Subject_id
+         WHERE c.Section_id = ? AND c.School_year_id = ?
+           AND s.Subject_name NOT REGEXP 'LUNCH|RECESS|BREAK'
+         ORDER BY s.Subject_name"
+    );
+    $cStmt->bind_param('ii', $sectionId, $syId);
+    $cStmt->execute();
+    $columns = stmt_fetch_all_assoc($cStmt);
+
+    // Grades for the period across those classes.
+    $grades = [];
+    if ($periodId > 0) {
+        $gStmt = $db->prepare(
+            "SELECT sg.student_id, sg.class_id, sg.grade, sg.status
+             FROM student_grade sg
+             JOIN classes c ON c.Class_id = sg.class_id
+             WHERE c.Section_id = ? AND c.School_year_id = ? AND sg.grading_period_id = ?"
+        );
+        $gStmt->bind_param('iii', $sectionId, $syId, $periodId);
+        $gStmt->execute();
+        foreach (stmt_fetch_all_assoc($gStmt) as $g) {
+            $grades[(int) $g['student_id']][(int) $g['class_id']] = [
+                'grade'  => $g['grade'],
+                'status' => (string) $g['status'],
+            ];
+        }
+    }
+
+    return ['columns' => $columns, 'grades' => $grades];
+}
+
 // ── Advisee management (the adviser correcting their advisory students' info) ──
 //
 // An adviser owns exactly one section per school year (advisory_class UNIQUE on
@@ -422,8 +470,43 @@ function teacher_update_advisee(mysqli $db, int $studentId, int $teacherId, int 
  * The teacher's classes for a school year — THE source of the class list.
  * Includes the roster size and how many grades are already encoded for $periodId.
  */
-function teacher_classes(mysqli $db, int $teacherId, int $syId, int $periodId = 0): array
+/**
+ * SQL fragment (for a query where `classes` is aliased `c`) that scopes classes
+ * to a Term for Senior High. A class whose semester matches a Term shows ONLY in
+ * that Term; year-long subjects (semester "N/A"/none) show every Term. Uses the
+ * given grading period, else the current one. Returns '' if the term has no
+ * semester link (then nothing is scoped).
+ */
+function _term_class_filter(mysqli $db, int $syId, int $periodId = 0): string
 {
+    $sql = $periodId > 0
+        ? 'SELECT semester_id FROM grading_period WHERE id = ' . (int) $periodId
+        : 'SELECT semester_id FROM grading_period WHERE school_year_id = ' . (int) $syId
+          . ' AND is_current = 1 ORDER BY term_no LIMIT 1';
+    $r = $db->query($sql);
+    $termSem = $r ? ($r->fetch_assoc()['semester_id'] ?? null) : null;
+    if ($termSem === null) {
+        return '';
+    }
+    $termSem = (int) $termSem;
+    $syId    = (int) $syId;
+    return " AND (c.Semester_id = $termSem"
+         . " OR c.Semester_id IS NULL OR c.Semester_id = 0"
+         . " OR c.Semester_id NOT IN (SELECT semester_id FROM grading_period"
+         . "     WHERE school_year_id = $syId AND semester_id IS NOT NULL))";
+}
+
+/**
+ * @param bool $academicOnly true = grading list (hide HRG/recess/breaks);
+ *                           false = full schedule (keep everything). Default full.
+ */
+function teacher_classes(mysqli $db, int $teacherId, int $syId, int $periodId = 0, bool $academicOnly = false): array
+{
+    $academicFilter = $academicOnly ? ' AND COALESCE(s.is_academic, 1) = 1' : '';
+    // Term scope (Senior High): a class tied to a Term's semester shows only in
+    // that Term; year-long subjects (semester N/A) show every Term. Uses the
+    // chosen period, else the current one.
+    $termFilter = _term_class_filter($db, $syId, $periodId);
     $stmt = $db->prepare(
         "SELECT c.Class_id, c.Time, c.class_status, c.Section_id, c.Subject_id, c.GradeLevel_id,
                 c.Semester_id, c.room_id,
@@ -433,7 +516,7 @@ function teacher_classes(mysqli $db, int $teacherId, int $syId, int $periodId = 
                 sem.Semester,
                 st.strand,
                 r.room AS room_name,
-                (SELECT COUNT(*) FROM student_classes sc WHERE sc.class_id = c.Class_id) AS student_count,
+                (SELECT COUNT(*) FROM studentinfo si WHERE si.Section = c.Section_id AND si.School_year_id = c.School_year_id) AS student_count,
                 (SELECT COUNT(*) FROM student_grade sg
                   WHERE sg.class_id = c.Class_id AND sg.grading_period_id = ? AND sg.grade IS NOT NULL) AS graded_count
          FROM classes c
@@ -443,7 +526,7 @@ function teacher_classes(mysqli $db, int $teacherId, int $syId, int $periodId = 
          LEFT JOIN semester   sem ON sem.Semester_id = c.Semester_id
          LEFT JOIN strand     st  ON st.strand_id    = c.strand_id
          LEFT JOIN room       r   ON r.room_id       = c.room_id
-         WHERE c.Teacher_id = ? AND c.School_year_id = ?
+         WHERE c.Teacher_id = ? AND c.School_year_id = ?" . $academicFilter . $termFilter . "
          ORDER BY gl.Gradelevel_id, sec.Section_name, s.Subject_name"
     );
     $stmt->bind_param('iii', $periodId, $teacherId, $syId);
@@ -504,8 +587,8 @@ function teacher_stats(mysqli $db, int $teacherId, int $syId, int $periodId): ar
         "SELECT
             COUNT(DISTINCT c.Class_id) AS class_count,
             COUNT(DISTINCT c.Subject_id) AS subject_count,
-            (SELECT COUNT(*) FROM student_classes sc
-               JOIN classes c2 ON c2.Class_id = sc.class_id
+            (SELECT COUNT(*) FROM classes c2
+               JOIN studentinfo si ON si.Section = c2.Section_id AND si.School_year_id = c2.School_year_id
               WHERE c2.Teacher_id = ? AND c2.School_year_id = ?) AS student_count,
             (SELECT COUNT(*) FROM student_grade sg
                JOIN classes c3 ON c3.Class_id = sg.class_id
@@ -538,8 +621,8 @@ function teacher_action_stats(mysqli $db, int $teacherId, int $syId, int $period
 
     // Roster size across all this teacher's classes = the encoding denominator.
     $r = $db->prepare(
-        'SELECT COUNT(*) c FROM student_classes sc
-         JOIN classes cl ON cl.Class_id = sc.class_id
+        'SELECT COUNT(*) c FROM classes cl
+         JOIN studentinfo si ON si.Section = cl.Section_id AND si.School_year_id = cl.School_year_id
          WHERE cl.Teacher_id = ? AND cl.School_year_id = ?'
     );
     $r->bind_param('ii', $teacherId, $syId);

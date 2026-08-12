@@ -123,7 +123,7 @@ foreach ($roster as $r) {
 
         <!-- Period tabs -->
         <div class="bg-white rounded-3xl border border-emerald-100 shadow-panel p-5 mb-6">
-            <p class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Grading Period</p>
+            <p class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Term</p>
             <div class="flex flex-wrap gap-2">
                 <?php foreach ($periods as $p): $on = (int) $p['id'] === $periodId; ?>
                 <a href="class_view.php?class_id=<?= $classId ?>&period=<?= (int) $p['id'] ?>"

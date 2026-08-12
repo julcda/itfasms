@@ -40,6 +40,12 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        if ($s = $request->session()->get('student')) {
+            app(\App\Services\AdminService::class)->recordLogin(
+                'logout', (int) ($s['account_id'] ?? 0) ?: null,
+                (int) ($s['enrollment_id'] ?? 0) ?: null, (string) ($s['lrn'] ?? '') ?: null
+            );
+        }
         $request->session()->forget('student');
         $request->session()->invalidate();
         $request->session()->regenerateToken();

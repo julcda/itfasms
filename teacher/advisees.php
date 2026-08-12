@@ -119,6 +119,12 @@ $pv = fn(string $k): string => trim((string) ($editProfile[$k] ?? '')) !== '' ? 
                 S.Y. <?= h($syLabel) ?>
                 <?php endif; ?>
             </p>
+            <?php if ($advisory): ?>
+            <a href="<?= h(app_url('teacher/advisee_grades.php')) ?>" class="inline-flex items-center gap-2 mt-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-4 py-2.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                Monitor Advisee Grades
+            </a>
+            <?php endif; ?>
         </header>
 
         <?php if ($flash): ?>

@@ -30,7 +30,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $periodId = to_int($_POST['period'] ?? 0) ?: null;
     try {
         $action = (string) ($_POST['action'] ?? '');
-        if ($action === 'publish') {
+        if ($action === 'publish_section') {
+            $sectionId = to_int($_POST['section_id'] ?? 0);
+            $n = cert_publish_section($connection, $sectionId, $syId, $periodId, $user);
+            flash_set($n > 0 ? 'success' : 'error', $n > 0
+                ? $n . ' certificate' . ($n === 1 ? '' : 's') . ' approved &amp; published for this section — now visible in the students&rsquo; portal accounts.'
+                : 'Nothing to approve: no draft certificates for this section.');
+        } elseif ($action === 'publish') {
             $n = cert_publish_period($connection, $syId, $periodId, $user);
             flash_set($n > 0 ? 'success' : 'error', $n > 0
                 ? $n . ' certificate' . ($n === 1 ? '' : 's') . ' published — now visible in the students&rsquo; portal accounts.'
@@ -51,9 +57,24 @@ $periodId = to_int($_GET['period'] ?? 0) ?: (int) ($current['id'] ?? 0);
 $rows     = $ready ? cert_list($connection, $syId, $periodId ?: null, $user) : [];
 
 $drafts = 0; $published = 0;
+$sections = [];
 foreach ($rows as $r) {
     if ($r['status'] === 'Draft') { $drafts++; }
     elseif ($r['status'] === 'Published') { $published++; }
+
+    $sid = (int) ($r['section_id'] ?? 0);
+    if (!isset($sections[$sid])) {
+        $sections[$sid] = [
+            'id'        => $sid,
+            'label'     => trim((string) ($r['grade_level'] ?? '') . ' — ' . (string) ($r['section_name'] ?? ''), ' —') ?: 'Unassigned section',
+            'rows'      => [],
+            'drafts'    => 0,
+            'published' => 0,
+        ];
+    }
+    $sections[$sid]['rows'][] = $r;
+    if ($r['status'] === 'Draft') { $sections[$sid]['drafts']++; }
+    elseif ($r['status'] === 'Published') { $sections[$sid]['published']++; }
 }
 $flash = flash_get();
 $csrf  = csrf_token();
@@ -79,7 +100,7 @@ $csrf  = csrf_token();
         <header class="bg-white/90 backdrop-blur rounded-3xl border border-green-100 shadow-panel p-6 mb-6">
             <p class="text-xs uppercase tracking-[0.2em] text-green-700 font-semibold">Department Head · Recognition</p>
             <h1 class="text-2xl sm:text-3xl font-extrabold mt-1">Certificates of Recognition</h1>
-            <p class="text-slate-500 mt-2">Review what your class advisers prepared, then publish. Published certificates appear in the student's portal account for viewing and printing.</p>
+            <p class="text-slate-500 mt-2">Review what your class advisers prepared, then approve <b>per section</b>. Approving a section publishes all of its certificates to the students&rsquo; portal accounts.</p>
             <p class="text-xs text-green-700 mt-2">S.Y. <?= h($syLabel) ?></p>
         </header>
 
@@ -95,7 +116,7 @@ $csrf  = csrf_token();
         <?php else: ?>
 
         <div class="bg-white rounded-3xl border border-green-100 shadow-panel p-5 mb-6">
-            <p class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Grading Period</p>
+            <p class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Term</p>
             <div class="flex flex-wrap gap-2">
                 <?php foreach ($periods as $p): $on = (int) $p['id'] === $periodId; ?>
                 <a href="certificates.php?period=<?= (int) $p['id'] ?>"
@@ -108,42 +129,58 @@ $csrf  = csrf_token();
 
         <div class="grid grid-cols-3 gap-4 mb-6">
             <div class="rounded-2xl bg-white ring-1 ring-slate-200 shadow-panel p-4">
-                <p class="text-xs uppercase tracking-wider text-slate-500 font-bold">Awaiting publish</p>
+                <p class="text-xs uppercase tracking-wider text-slate-500 font-bold">Awaiting approval</p>
                 <p class="text-2xl font-extrabold text-slate-700 mt-1"><?= $drafts ?></p>
             </div>
             <div class="rounded-2xl bg-white ring-1 ring-emerald-200 shadow-panel p-4">
                 <p class="text-xs uppercase tracking-wider text-emerald-600 font-bold">Published</p>
                 <p class="text-2xl font-extrabold text-emerald-700 mt-1"><?= $published ?></p>
             </div>
-            <div class="rounded-2xl bg-white ring-1 ring-slate-200 shadow-panel p-4 flex items-center">
-                <?php if ($drafts > 0): ?>
-                <form method="POST" action="certificates.php" class="w-full"
-                      onsubmit="return confirm('Publish <?= $drafts ?> certificate(s)? Students will be able to view and print them.');">
-                    <input type="hidden" name="csrf_token" value="<?= h($csrf) ?>">
-                    <input type="hidden" name="action" value="publish">
-                    <input type="hidden" name="period" value="<?= $periodId ?>">
-                    <button class="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-5 py-3">📤 Publish <?= $drafts ?> Certificate<?= $drafts === 1 ? '' : 's' ?></button>
-                </form>
-                <?php else: ?>
-                <p class="text-xs text-slate-400 w-full text-center">Nothing waiting to publish.</p>
-                <?php endif; ?>
+            <div class="rounded-2xl bg-white ring-1 ring-slate-200 shadow-panel p-4">
+                <p class="text-xs uppercase tracking-wider text-slate-500 font-bold">Sections</p>
+                <p class="text-2xl font-extrabold text-slate-700 mt-1"><?= count($sections) ?></p>
             </div>
         </div>
 
-        <section class="bg-white rounded-3xl border border-green-100 shadow-panel overflow-hidden">
-            <?php if (!$rows): ?>
-            <div class="p-10 text-center text-slate-400">
-                <p class="font-semibold">No certificates for this period yet.</p>
-                <p class="text-sm mt-1">Class advisers prepare them from their Certificates page.</p>
+        <?php if (!$rows): ?>
+        <section class="bg-white rounded-3xl border border-green-100 shadow-panel p-10 text-center text-slate-400">
+            <p class="font-semibold">No certificates for this period yet.</p>
+            <p class="text-sm mt-1">Class advisers prepare them from their Certificates page.</p>
+        </section>
+        <?php else: ?>
+
+        <p class="text-sm text-slate-500 mb-4">Approval is done <b>per section</b> — review a class, then approve all of its certificates at once.</p>
+
+        <?php foreach ($sections as $sec): ?>
+        <section class="bg-white rounded-3xl border border-green-100 shadow-panel overflow-hidden mb-5">
+            <div class="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-100 bg-slate-50/60">
+                <div>
+                    <h2 class="font-extrabold text-lg"><?= h($sec['label']) ?></h2>
+                    <p class="text-xs text-slate-500">
+                        <?= count($sec['rows']) ?> certificate<?= count($sec['rows']) === 1 ? '' : 's' ?> ·
+                        <b class="text-amber-700"><?= $sec['drafts'] ?></b> awaiting ·
+                        <b class="text-emerald-700"><?= $sec['published'] ?></b> published
+                    </p>
+                </div>
+                <?php if ($sec['drafts'] > 0): ?>
+                <form method="POST" action="certificates.php"
+                      onsubmit="return confirm('Approve &amp; publish <?= $sec['drafts'] ?> certificate(s) for <?= h(addslashes($sec['label'])) ?>? Students will be able to view and print them.');">
+                    <input type="hidden" name="csrf_token" value="<?= h($csrf) ?>">
+                    <input type="hidden" name="action" value="publish_section">
+                    <input type="hidden" name="section_id" value="<?= (int) $sec['id'] ?>">
+                    <input type="hidden" name="period" value="<?= $periodId ?>">
+                    <button class="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-5 py-2.5">✓ Approve Section (<?= $sec['drafts'] ?>)</button>
+                </form>
+                <?php else: ?>
+                <span class="text-xs font-bold text-emerald-700">✓ All approved</span>
+                <?php endif; ?>
             </div>
-            <?php else: ?>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead class="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
                         <tr>
                             <th class="text-left px-6 py-3">Student</th>
-                            <th class="text-left">Grade &amp; Section</th>
-                            <th class="text-left">Honor</th>
+                            <th class="text-left">Award</th>
                             <th class="text-center">Average</th>
                             <th class="text-left">Adviser</th>
                             <th class="text-center">Status</th>
@@ -151,14 +188,13 @@ $csrf  = csrf_token();
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                    <?php foreach ($rows as $c): ?>
+                    <?php foreach ($sec['rows'] as $c): ?>
                         <tr class="hover:bg-green-50/30">
                             <td class="px-6 py-3">
                                 <p class="font-bold"><?= h((string) $c['student_name']) ?></p>
                                 <p class="text-[10px] text-slate-400 font-mono"><?= h((string) $c['certificate_no']) ?></p>
                             </td>
-                            <td class="text-slate-600 text-xs"><?= h((string) ($c['grade_level'] ?? '')) ?> — <?= h((string) ($c['section_name'] ?? '')) ?></td>
-                            <td><span class="text-[10px] font-extrabold rounded-full px-2 py-0.5 border <?= cert_level_badge((string) $c['honor_level']) ?>"><?= h((string) $c['honor_level']) ?></span></td>
+                            <td><span class="text-[10px] font-extrabold rounded-full px-2 py-0.5 border <?= cert_type_badge((string) $c['type']) ?>"><?= h(cert_display_title($c)) ?></span></td>
                             <td class="text-center font-bold"><?= $c['general_average'] !== null ? number_format((float) $c['general_average'], 2) : '—' ?></td>
                             <td class="text-xs text-slate-500"><?= h((string) ($c['adviser_name'] ?: '—')) ?></td>
                             <td class="text-center"><span class="text-[10px] font-extrabold rounded-full px-2 py-0.5 border <?= cert_status_badge((string) $c['status']) ?>"><?= h((string) $c['status']) ?></span></td>
@@ -180,8 +216,9 @@ $csrf  = csrf_token();
                     </tbody>
                 </table>
             </div>
-            <?php endif; ?>
         </section>
+        <?php endforeach; ?>
+        <?php endif; ?>
         <?php endif; ?>
     </main>
 </div>

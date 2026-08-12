@@ -61,7 +61,7 @@ class LessonResourceController extends TeacherController
         $lesson = $this->ownedLesson($request, (int) $resource->lesson_id); // authorizes
 
         if ($resource->file_path) {
-            $full = rtrim((string) config('portal.uploads_path'), '/\\') . '/' . $resource->file_path;
+            $full = rtrim((string) config('portal.lms_uploads_path'), '/\\') . '/' . $resource->file_path;
             if (is_file($full)) {
                 @unlink($full);
             }
@@ -150,20 +150,25 @@ class LessonResourceController extends TeacherController
         return $this->persist($file, $ext, (string) $file->getMimeType());
     }
 
-    /** Store under the SAME shared uploads root the native app already serves. */
+    /** Store under the portal's own LMS uploads root (writable + served by the portal). */
     private function persist(UploadedFile $file, string $ext, string $mime): array
     {
-        $dir = rtrim((string) config('portal.uploads_path'), '/\\') . '/classroom_lessons';
+        $dir = rtrim((string) config('portal.lms_uploads_path'), '/\\') . '/classroom_lessons';
         if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
             throw new RuntimeException('Upload storage is not writable on the server.');
         }
+        // Capture size/name BEFORE the move — afterwards the temp file is gone
+        // and getSize() throws a stat error, which broke document/image uploads.
+        $size = (int) $file->getSize();
+        $name = (string) $file->getClientOriginalName();
+
         $stored = Str::random(32) . '.' . $ext;
         $file->move($dir, $stored);
 
         return [
             'file_path' => 'classroom_lessons/' . $stored,
-            'file_name' => $file->getClientOriginalName(),
-            'file_size' => $file->getSize(),
+            'file_name' => $name,
+            'file_size' => $size,
             'mime_type' => $mime,
         ];
     }

@@ -12,10 +12,12 @@
 <div class="grid md:grid-cols-2 gap-5">
     @foreach ($certs as $c)
     @php
-        $lvl = (string) $c->honor_level;
-        $hi = str_contains($lvl, 'Highest');
-        $h2 = !$hi && str_contains($lvl, 'High');
-        $grad = $hi ? 'from-amber-500 to-orange-600' : ($h2 ? 'from-violet-500 to-purple-600' : 'from-sky-500 to-blue-600');
+        $lvl  = (string) ($c->award_title ?: $c->honor_level ?: ($c->type ?? 'Certificate'));
+        $grad = match ((string) ($c->type ?? '')) {
+            'Perfect Attendance' => 'from-emerald-500 to-teal-600',
+            'Special Award'      => 'from-violet-500 to-purple-600',
+            default              => 'from-amber-500 to-orange-600',
+        };
     @endphp
     <article class="bg-white dark:bg-slate-800/60 rounded-3xl border border-green-100 dark:border-slate-700 shadow-panel overflow-hidden">
         <div class="bg-gradient-to-br {{ $grad }} px-5 py-4 text-white">

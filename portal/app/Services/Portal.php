@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Services\AdminService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
@@ -116,10 +117,12 @@ class Portal
             return ['ok' => false, 'error' => 'Your portal account is inactive. Please contact the registrar.'];
         }
         if (!Hash::check($password, (string) $account->password_hash)) {
+            app(AdminService::class)->recordLogin('failed', (int) $account->id, (int) $resolved->enrollment_id, (string) $resolved->lrn);
             return ['ok' => false, 'error' => 'Invalid password.'];
         }
 
         DB::table('student_portal_accounts')->where('id', $account->id)->update(['last_login' => now()]);
+        app(AdminService::class)->recordLogin('login', (int) $account->id, (int) $resolved->enrollment_id, (string) $resolved->lrn);
 
         return ['ok' => true, 'student' => [
             'account_id'    => (int) $account->id,
@@ -179,10 +182,47 @@ class Portal
         return rtrim((string) config('portal.uploads_url'), '/');
     }
 
-    /** Resolve the student's photo URL (portal/native upload wins, then legacy). */
+    /** Portal-owned student photo storage (written + served on the portal's own domain). */
+    public function studentPhotosPath(): string
+    {
+        // Fall back to public/student-photos so uploads still work even if the
+        // config cache on the server predates the student_photos_path key.
+        $path = (string) config('portal.student_photos_path');
+        if ($path === '') {
+            $path = public_path('student-photos');
+        }
+        return rtrim($path, '/\\');
+    }
+
+    public function studentPhotosUrl(): string
+    {
+        $url = (string) config('portal.student_photos_url');
+        if ($url === '') {
+            $url = '/student-photos';
+        }
+        return rtrim($url, '/');
+    }
+
+    /**
+     * Resolve the student's photo URL. Priority:
+     *   1. Portal-uploaded photo (own domain — always displays, even on a subdomain),
+     *   2. the registrar's shared/native photo, then
+     *   3. the legacy `photo` column.
+     */
     public function photoUrl(object $profile): ?string
     {
         $enrollmentId = (int) ($profile->enrollment_id ?? 0);
+
+        // 1) Portal-owned upload (public/student-photos), served on the portal domain.
+        $pBase = $this->studentPhotosPath();
+        foreach (['jpg', 'jpeg', 'png', 'webp'] as $ext) {
+            $file = $pBase . '/' . $enrollmentId . '.' . $ext;
+            if (is_file($file)) {
+                return $this->studentPhotosUrl() . '/' . $enrollmentId . '.' . $ext . '?v=' . filemtime($file);
+            }
+        }
+
+        // 2) Registrar's official photo in the shared/native uploads folder.
         $base = $this->sharedUploadsPath();
         foreach (['jpg', 'jpeg', 'png', 'webp'] as $ext) {
             $file = $base . '/student_photos/' . $enrollmentId . '.' . $ext;
@@ -190,6 +230,8 @@ class Portal
                 return $this->sharedUploadsUrl() . '/student_photos/' . $enrollmentId . '.' . $ext . '?v=' . filemtime($file);
             }
         }
+
+        // 3) Legacy photo column.
         $legacy = trim((string) ($profile->photo ?? ''));
         if ($legacy !== '' && is_file($base . '/' . $legacy)) {
             return $this->sharedUploadsUrl() . '/' . $legacy;

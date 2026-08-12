@@ -21,7 +21,7 @@ if ($period && (int) $period['school_year_id'] !== $sy['id']) {
     $periodId = (int) ($current['id'] ?? 0);
 }
 
-$classes = teacher_classes($db, $tid, $sy['id'], $periodId);
+$classes = teacher_classes($db, $tid, $sy['id'], $periodId, true);  // grading list — hide HRG/recess/breaks
 $flash   = flash_get();
 ?>
 <!doctype html>
@@ -55,7 +55,7 @@ $flash   = flash_get();
 
         <!-- Period selector -->
         <div class="bg-white rounded-3xl border border-emerald-100 shadow-panel p-5 mb-6">
-            <p class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Grading Period</p>
+            <p class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Term</p>
             <div class="flex flex-wrap gap-2">
                 <?php foreach ($periods as $p): $on = (int) $p['id'] === $periodId; ?>
                 <a href="classes.php?period=<?= (int) $p['id'] ?>"

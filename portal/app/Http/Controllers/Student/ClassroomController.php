@@ -9,6 +9,7 @@ use App\Models\Classroom\Lesson;
 use App\Models\Classroom\LessonProgress;
 use App\Models\Legacy\SchoolClass;
 use App\Models\Legacy\StudentClass;
+use App\Models\Legacy\StudentInfo;
 use App\Services\Portal;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
@@ -52,9 +53,13 @@ class ClassroomController extends Controller
         $studentInfoId = $this->studentInfoId($request);
         [$profile, $photoUrl] = $this->profile($request, $this->portal);
 
-        $classIds = StudentClass::where('student_id', $studentInfoId)->pluck('class_id');
+        // A student's classes are their section's classes (derived live, no roster table).
+        $student = StudentInfo::find($studentInfoId);
         $classes = SchoolClass::with(['subject', 'section', 'teacher'])
-            ->whereIn('Class_id', $classIds)
+            ->academic()
+            ->currentTerm()
+            ->where('Section_id', $student?->Section)
+            ->where('School_year_id', $student?->School_year_id)
             ->get()
             ->map(function (SchoolClass $c) {
                 $c->setAttribute('published_lesson_count', Lesson::where('class_id', $c->Class_id)->where('status', 'published')->count());

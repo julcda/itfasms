@@ -55,7 +55,7 @@ $valid  = $cert !== null && (string) $cert['status'] === 'Published';
                 <div class="flex justify-between py-2"><dt class="text-slate-500">Certificate No.</dt><dd class="font-mono font-bold"><?= h((string) $cert['certificate_no']) ?></dd></div>
                 <div class="flex justify-between py-2 gap-4"><dt class="text-slate-500 shrink-0">Awarded to</dt><dd class="font-bold text-right"><?= h((string) $cert['student_name']) ?></dd></div>
                 <div class="flex justify-between py-2 gap-4"><dt class="text-slate-500 shrink-0">Grade &amp; Section</dt><dd class="font-semibold text-right"><?= h((string) ($cert['grade_level'] ?? '')) ?> — <?= h((string) ($cert['section_name'] ?? '')) ?></dd></div>
-                <div class="flex justify-between py-2 gap-4"><dt class="text-slate-500 shrink-0">Recognition</dt><dd class="font-extrabold text-right"><?= h((string) $cert['honor_level']) ?></dd></div>
+                <div class="flex justify-between py-2 gap-4"><dt class="text-slate-500 shrink-0">Recognition</dt><dd class="font-extrabold text-right"><?= h(cert_display_title($cert)) ?></dd></div>
                 <?php if ($cert['general_average'] !== null): ?>
                 <div class="flex justify-between py-2"><dt class="text-slate-500">General Average</dt><dd class="font-bold"><?= number_format((float) $cert['general_average'], 2) ?></dd></div>
                 <?php endif; ?>

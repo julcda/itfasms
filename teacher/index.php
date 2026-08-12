@@ -21,7 +21,7 @@ $periodId = (int) ($period['id'] ?? 0);
 $stats     = $ready ? teacher_stats($db, $tid, $sy['id'], $periodId) : ['class_count'=>0,'subject_count'=>0,'student_count'=>0,'graded_count'=>0];
 $act       = $ready ? teacher_action_stats($db, $tid, $sy['id'], $periodId) : ['to_encode'=>0,'awaiting'=>0,'returned'=>0,'approved'=>0,'roster_total'=>0,'encoded'=>0,'percent'=>0];
 $advisory  = $ready ? teacher_advisory($db, $tid, $sy['id']) : null;
-$classes   = $ready ? teacher_classes($db, $tid, $sy['id'], $periodId) : [];
+$classes   = $ready ? teacher_classes($db, $tid, $sy['id'], $periodId, true) : [];  // grading cards — hide HRG/recess
 $schedule  = $ready ? teacher_schedule($db, $tid, $sy['id']) : [];
 $announce  = $ready ? teacher_announcements($db, 4) : [];
 $unreadMsg = msg_unread_total($db, (int) $user['id']);
@@ -188,11 +188,11 @@ foreach ($classes as $c) {
                 <p class="text-xs text-slate-400"><?= h(teacher_day_name($today)) ?>'s classes</p>
             </div>
 
-            <!-- Grading progress: a ratio against a limit → meter, not a chart -->
+            <!-- Term progress: a ratio against a limit → meter, not a chart -->
             <div class="rounded-2xl bg-white ring-1 ring-slate-200 shadow-panel p-4">
                 <div class="flex items-center justify-between">
                     <p class="text-xs uppercase tracking-wider text-slate-500 font-bold">
-                        Grading progress<?= $period ? ' · ' . h((string) $period['code']) : '' ?>
+                        Term progress<?= $period ? ' · ' . h((string) $period['code']) : '' ?>
                     </p>
                     <span class="text-xs font-extrabold <?= $act['percent'] >= 100 ? 'text-emerald-700' : 'text-slate-600' ?>"><?= (int) $act['percent'] ?>%</span>
                 </div>

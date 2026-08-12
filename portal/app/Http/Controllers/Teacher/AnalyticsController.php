@@ -20,7 +20,7 @@ class AnalyticsController extends TeacherController
     {
         $class = $this->ownedClass($request, $classId);
 
-        $roster = StudentClass::where('class_id', $classId)->pluck('student_id')->filter()->unique()->values();
+        $roster = $class->rosterStudentIds()->filter()->unique()->values();
         $rosterCount = $roster->count();
 
         // Lessons

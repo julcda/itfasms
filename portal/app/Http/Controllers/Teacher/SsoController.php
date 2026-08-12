@@ -21,9 +21,13 @@ class SsoController extends Controller
     public function consume(Request $request, string $ticket)
     {
         $ticket = DB::transaction(function () use ($ticket) {
+            // Compare expiry against the DATABASE clock (NOW()), not Laravel's
+            // now(): the native app stamps expires_at with MySQL NOW(), so using
+            // the same clock here makes the check immune to any timezone/NTP skew
+            // between the two apps. Both hit the same shared MySQL server.
             $row = SsoTicket::where('ticket', $ticket)
                 ->whereNull('used_at')
-                ->where('expires_at', '>', now())
+                ->whereRaw('expires_at > NOW()')
                 ->lockForUpdate()
                 ->first();
             if ($row) {

@@ -30,47 +30,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $action = (string) ($_POST['action'] ?? '');
 
         if ($action === 'issue') {
-            $period  = $periodId ? gp_get($db, $periodId) : null;
-            $levels  = (array) ($_POST['level'] ?? []);
-            $roster  = cert_advisory_students($db, (int) $advisory['section_id'], $syId, $periodId);
-            $byId    = [];
+            $period = $periodId ? gp_get($db, $periodId) : null;
+            $roster = cert_advisory_students($db, (int) $advisory['section_id'], $syId, $periodId);
+            $byId   = [];
             foreach ($roster as $r) { $byId[(int) $r['student_id']] = $r; }
 
-            $issued = 0; $errors = [];
-            foreach ($levels as $sid => $lvl) {
-                $lvl = trim((string) $lvl);
-                if ($lvl === '') { continue; }              // not selected
-                $sid = (int) $sid;
-                if (!isset($byId[$sid])) {
-                    $errors[] = 'Student #' . $sid . ' is not in your advisory class.';
-                    continue;
-                }
-                $st = $byId[$sid];
-                try {
-                    cert_issue($db, [
-                        'student_id'         => $sid,
-                        'student_name'       => $st['full_name'],
-                        'lrn'                => $st['LRN_no'],
-                        'grade_level'        => $st['Gradelevel'] ?? ($advisory['Gradelevel'] ?? ''),
-                        'section_name'       => $st['Section_name'] ?? ($advisory['Section_name'] ?? ''),
-                        'school_year_id'     => $syId,
-                        'school_year'        => $syLabel,
-                        'grading_period_id'  => $periodId,
-                        'period_name'        => $period['name'] ?? null,
-                        'honor_level'        => $lvl,
-                        'general_average'    => $st['average'],
-                        'adviser_teacher_id' => $tid,
-                        'adviser_name'       => teacher_display_name($teacher),
-                    ], $user);
-                    $issued++;
-                } catch (Throwable $e) {
-                    $errors[] = $st['full_name'] . ': ' . $e->getMessage();
+            $ae = (array) ($_POST['ae'] ?? []);   // [sid => '1'] Academic Excellence
+            $pa = (array) ($_POST['pa'] ?? []);   // [sid => '1'] Perfect Attendance
+            $sa = (array) ($_POST['sa'] ?? []);   // [sid => 'title'] Special Award
+
+            $issued = 0; $removed = 0; $errors = [];
+            foreach ($byId as $sid => $st) {
+                $want = [
+                    'Academic Excellence' => !empty($ae[$sid]),
+                    'Perfect Attendance'  => !empty($pa[$sid]),
+                    'Special Award'       => trim((string) ($sa[$sid] ?? '')) !== '',
+                ];
+                foreach ($want as $type => $on) {
+                    $existing  = $st['certs'][$type] ?? null;
+                    $published = $existing && (string) $existing['status'] === 'Published';
+                    if ($published) { continue; }   // locked — must be revoked by the head
+
+                    if ($on) {
+                        try {
+                            cert_issue($db, [
+                                'student_id'         => $sid,
+                                'student_name'       => $st['full_name'],
+                                'lrn'                => $st['LRN_no'],
+                                'grade_level'        => $st['Gradelevel'] ?? ($advisory['Gradelevel'] ?? ''),
+                                'section_name'       => $st['Section_name'] ?? ($advisory['Section_name'] ?? ''),
+                                'school_year_id'     => $syId,
+                                'school_year'        => $syLabel,
+                                'grading_period_id'  => $periodId,
+                                'period_name'        => $period['name'] ?? null,
+                                'type'               => $type,
+                                'award_title'        => $type === 'Special Award' ? (string) $sa[$sid] : null,
+                                'general_average'    => $type === 'Academic Excellence' ? $st['average'] : null,
+                                'adviser_teacher_id' => $tid,
+                                'adviser_name'       => teacher_display_name($teacher),
+                            ], $user);
+                            $issued++;
+                        } catch (Throwable $e) {
+                            $errors[] = $st['full_name'] . ' (' . $type . '): ' . $e->getMessage();
+                        }
+                    } elseif ($existing && (string) $existing['status'] === 'Draft') {
+                        // Deselected an award that was only a draft — remove it.
+                        try { cert_delete_draft($db, (int) $existing['id'], $user); $removed++; } catch (Throwable $e) {}
+                    }
                 }
             }
-            flash_set($errors ? 'error' : 'success',
-                $issued . ' certificate' . ($issued === 1 ? '' : 's') . ' prepared'
-                . ($errors ? ' · ' . implode(' ', array_slice($errors, 0, 2)) : '')
-                . ($issued > 0 && !$errors ? ' — waiting for the Department Head to publish them.' : ''));
+            $parts = [];
+            if ($issued)  { $parts[] = $issued . ' certificate' . ($issued === 1 ? '' : 's') . ' prepared'; }
+            if ($removed) { $parts[] = $removed . ' draft' . ($removed === 1 ? '' : 's') . ' removed'; }
+            $msg = $parts ? implode(' · ', $parts) : 'No changes.';
+            if ($issued && !$errors) { $msg .= ' — waiting for the Department Head to publish.'; }
+            if ($errors) { $msg .= ' · ' . implode(' ', array_slice($errors, 0, 2)); }
+            flash_set($errors ? 'error' : 'success', $msg);
 
         } elseif ($action === 'delete') {
             cert_delete_draft($db, to_int($_POST['cert_id'] ?? 0), $user);
@@ -92,7 +107,7 @@ $students = ($advisory && $periodId)
     : [];
 
 $eligible = 0;
-foreach ($students as $s) { if ($s['suggested'] !== null) { $eligible++; } }
+foreach ($students as $s) { if ($s['is_honor']) { $eligible++; } }
 
 $flash = flash_get();
 $csrf  = csrf_token();
@@ -118,7 +133,7 @@ $csrf  = csrf_token();
         <header class="bg-white/90 backdrop-blur rounded-3xl border border-emerald-100 shadow-panel p-6 mb-6">
             <p class="text-xs uppercase tracking-[0.2em] text-emerald-700 font-semibold">Class Adviser</p>
             <h1 class="text-2xl sm:text-3xl font-extrabold mt-1">Certificates of Recognition</h1>
-            <p class="text-slate-500 mt-2">Award academic honors to students in your advisory class. Certificates become visible to students once the Department Head publishes them.</p>
+            <p class="text-slate-500 mt-2">Award certificates to students in your advisory class. They become visible to students once the Department Head publishes them.</p>
             <?php if ($advisory): ?>
             <p class="text-xs text-emerald-700 mt-2 font-bold">Advisory: <?= h((string) ($advisory['Gradelevel'] ?? '')) ?> — <?= h((string) ($advisory['Section_name'] ?? '')) ?> · S.Y. <?= h($syLabel) ?></p>
             <?php endif; ?>
@@ -131,7 +146,7 @@ $csrf  = csrf_token();
         <?php if (!$ready): ?>
         <div class="rounded-3xl bg-white border border-amber-300 shadow-panel p-6">
             <h2 class="font-extrabold text-amber-700 mb-1">⚠ Certificate tables not installed</h2>
-            <p class="text-sm text-slate-600">Run <code>migrations/certificates.sql</code> first.</p>
+            <p class="text-sm text-slate-600">Run <code>migrations/certificates.sql</code> then <code>migrations/certificates_awards_update.sql</code>.</p>
         </div>
 
         <?php elseif (!$advisory): ?>
@@ -148,7 +163,7 @@ $csrf  = csrf_token();
 
         <!-- Period tabs -->
         <div class="bg-white rounded-3xl border border-emerald-100 shadow-panel p-5 mb-6">
-            <p class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Grading Period</p>
+            <p class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Term</p>
             <div class="flex flex-wrap gap-2">
                 <?php foreach ($periods as $p): $on = (int) $p['id'] === $periodId; ?>
                 <a href="certificates.php?period=<?= (int) $p['id'] ?>"
@@ -159,14 +174,20 @@ $csrf  = csrf_token();
             </div>
         </div>
 
-        <!-- Honor bands reference -->
-        <div class="grid grid-cols-3 gap-4 mb-6">
-            <?php foreach (cert_honor_bands() as $b): ?>
-            <div class="rounded-2xl bg-white ring-1 ring-slate-200 shadow-panel p-4 text-center">
-                <p class="text-xs font-extrabold uppercase tracking-wider <?= str_contains($b['level'],'Highest') ? 'text-amber-700' : (str_contains($b['level'],'High') ? 'text-violet-700' : 'text-sky-700') ?>"><?= h($b['level']) ?></p>
-                <p class="text-lg font-extrabold text-slate-800 mt-1"><?= number_format($b['min'], 0) ?>–<?= number_format($b['max'], 0) ?></p>
+        <!-- Award types reference -->
+        <div class="grid sm:grid-cols-3 gap-4 mb-6">
+            <div class="rounded-2xl bg-white ring-1 ring-amber-200 shadow-panel p-4">
+                <p class="text-xs font-extrabold uppercase tracking-wider text-amber-700">Academic Excellence</p>
+                <p class="text-sm text-slate-500 mt-1">For honor students — general average <b>90 and above</b>.</p>
             </div>
-            <?php endforeach; ?>
+            <div class="rounded-2xl bg-white ring-1 ring-emerald-200 shadow-panel p-4">
+                <p class="text-xs font-extrabold uppercase tracking-wider text-emerald-700">Perfect Attendance</p>
+                <p class="text-sm text-slate-500 mt-1">For any student with perfect attendance for the period.</p>
+            </div>
+            <div class="rounded-2xl bg-white ring-1 ring-violet-200 shadow-panel p-4">
+                <p class="text-xs font-extrabold uppercase tracking-wider text-violet-700">Special Award</p>
+                <p class="text-sm text-slate-500 mt-1">Any recognition — type its title (e.g. Leadership Award).</p>
+            </div>
         </div>
 
         <form method="POST" action="certificates.php">
@@ -178,7 +199,7 @@ $csrf  = csrf_token();
                 <div class="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-100">
                     <div>
                         <h2 class="font-extrabold text-lg">Advisory Class</h2>
-                        <p class="text-xs text-slate-500"><?= count($students) ?> student<?= count($students) === 1 ? '' : 's' ?> · <b class="text-emerald-700"><?= $eligible ?></b> qualify for honors</p>
+                        <p class="text-xs text-slate-500"><?= count($students) ?> student<?= count($students) === 1 ? '' : 's' ?> · <b class="text-emerald-700"><?= $eligible ?></b> qualify for Academic Excellence</p>
                     </div>
                     <p class="text-xs text-slate-400">Averages use approved grades only.</p>
                 </div>
@@ -193,25 +214,30 @@ $csrf  = csrf_token();
                                 <th class="text-left px-6 py-3 w-10">#</th>
                                 <th class="text-left">Student</th>
                                 <th class="text-center">Average</th>
-                                <th class="text-left">Qualifies for</th>
-                                <th class="text-left w-56">Award</th>
-                                <th class="text-center">Certificate</th>
+                                <th class="text-center">Academic<br>Excellence</th>
+                                <th class="text-center">Perfect<br>Attendance</th>
+                                <th class="text-left w-52">Special Award</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
                         <?php foreach ($students as $i => $s):
-                            $sid  = (int) $s['student_id'];
-                            $has  = $s['cert_id'] !== null;
-                            $cs   = (string) ($s['cert_status'] ?? '');
-                            $lock = $has && $cs === 'Published';
+                            $sid   = (int) $s['student_id'];
+                            $cAE   = $s['certs']['Academic Excellence'] ?? null;
+                            $cPA   = $s['certs']['Perfect Attendance'] ?? null;
+                            $cSA   = $s['certs']['Special Award'] ?? null;
+                            $pubAE = $cAE && $cAE['status'] === 'Published';
+                            $pubPA = $cPA && $cPA['status'] === 'Published';
+                            $pubSA = $cSA && $cSA['status'] === 'Published';
+                            $ckAE  = $cAE ? true : (bool) $s['is_honor'];
+                            $ckPA  = (bool) $cPA;
                         ?>
-                            <tr class="hover:bg-emerald-50/30 <?= $s['suggested'] ? 'bg-amber-50/30' : '' ?>">
-                                <td class="px-6 py-2.5 text-slate-400"><?= $i + 1 ?></td>
-                                <td>
+                            <tr class="hover:bg-emerald-50/30 <?= $s['is_honor'] ? 'bg-amber-50/20' : '' ?>">
+                                <td class="px-6 py-2.5 text-slate-400 align-top"><?= $i + 1 ?></td>
+                                <td class="align-top py-2.5">
                                     <p class="font-semibold"><?= h((string) $s['full_name']) ?></p>
                                     <p class="text-xs text-slate-400 font-mono"><?= h((string) ($s['LRN_no'] ?: '—')) ?></p>
                                 </td>
-                                <td class="text-center">
+                                <td class="text-center align-top py-2.5">
                                     <?php if ($s['average'] === null): ?>
                                         <span class="text-xs text-slate-400">—</span>
                                     <?php else: ?>
@@ -221,31 +247,37 @@ $csrf  = csrf_token();
                                         <?php endif; ?>
                                     <?php endif; ?>
                                 </td>
-                                <td>
-                                    <?php if ($s['suggested']): ?>
-                                    <span class="text-[10px] font-extrabold rounded-full px-2 py-0.5 border <?= cert_level_badge((string) $s['suggested']) ?>"><?= h((string) $s['suggested']) ?></span>
+                                <?php // Academic Excellence ?>
+                                <td class="text-center align-top py-2.5">
+                                    <?php if ($pubAE): ?>
+                                        <span class="text-[9px] font-extrabold rounded-full px-2 py-0.5 border <?= cert_status_badge('Published') ?>">PUBLISHED</span>
                                     <?php else: ?>
-                                    <span class="text-xs text-slate-400">—</span>
+                                        <input type="checkbox" name="ae[<?= $sid ?>]" value="1" <?= $ckAE ? 'checked' : '' ?>
+                                               class="w-4 h-4 accent-amber-600 cursor-pointer">
+                                        <?php if ($cAE): ?><span class="block text-[9px] text-slate-400 mt-0.5"><?= h((string) $cAE['status']) ?></span><?php endif; ?>
                                     <?php endif; ?>
                                 </td>
-                                <td>
-                                    <?php if ($lock): ?>
-                                    <span class="text-xs text-slate-400 italic">published — locked</span>
+                                <?php // Perfect Attendance ?>
+                                <td class="text-center align-top py-2.5">
+                                    <?php if ($pubPA): ?>
+                                        <span class="text-[9px] font-extrabold rounded-full px-2 py-0.5 border <?= cert_status_badge('Published') ?>">PUBLISHED</span>
                                     <?php else: ?>
-                                    <select name="level[<?= $sid ?>]" class="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
-                                        <option value="">— no award —</option>
-                                        <?php foreach (cert_levels() as $lv): ?>
-                                        <option value="<?= h($lv) ?>" <?= ($s['cert_level'] ?? $s['suggested']) === $lv ? 'selected' : '' ?>><?= h($lv) ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
+                                        <input type="checkbox" name="pa[<?= $sid ?>]" value="1" <?= $ckPA ? 'checked' : '' ?>
+                                               class="w-4 h-4 accent-emerald-600 cursor-pointer">
+                                        <?php if ($cPA): ?><span class="block text-[9px] text-slate-400 mt-0.5"><?= h((string) $cPA['status']) ?></span><?php endif; ?>
                                     <?php endif; ?>
                                 </td>
-                                <td class="text-center">
-                                    <?php if ($has): ?>
-                                    <span class="text-[10px] font-extrabold rounded-full px-2 py-0.5 border <?= cert_status_badge($cs) ?>"><?= h($cs) ?></span>
-                                    <p class="text-[9px] text-slate-400 font-mono mt-0.5"><?= h((string) $s['certificate_no']) ?></p>
+                                <?php // Special Award ?>
+                                <td class="align-top py-2.5 pr-4">
+                                    <?php if ($pubSA): ?>
+                                        <span class="text-[9px] font-extrabold rounded-full px-2 py-0.5 border <?= cert_status_badge('Published') ?>">PUBLISHED</span>
+                                        <p class="text-[10px] text-slate-500 mt-0.5"><?= h((string) ($cSA['award_title'] ?? '')) ?></p>
                                     <?php else: ?>
-                                    <span class="text-xs text-slate-300">—</span>
+                                        <input type="text" name="sa[<?= $sid ?>]" maxlength="120"
+                                               value="<?= h((string) ($cSA['award_title'] ?? '')) ?>"
+                                               placeholder="e.g. Leadership Award"
+                                               class="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
+                                        <?php if ($cSA): ?><span class="block text-[9px] text-slate-400 mt-0.5"><?= h((string) $cSA['status']) ?> · clear to remove</span><?php endif; ?>
                                     <?php endif; ?>
                                 </td>
                             </tr>
@@ -256,11 +288,11 @@ $csrf  = csrf_token();
 
                 <div class="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/60">
                     <p class="text-xs text-slate-500">
-                        The suggested level is pre-selected from the average — you may change it. Leave “no award” for students who should not receive one.
+                        Academic Excellence is pre-checked for honor students (90+). Tick any award to prepare it; un-tick (or clear the Special title) to drop a draft. Published awards are locked until the head revokes them.
                     </p>
-                    <button type="submit" onclick="return confirm('Prepare certificates for the selected students?');"
+                    <button type="submit" onclick="return confirm('Save the selected awards for this class?');"
                             class="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-6 py-2.5">
-                        🎖 Prepare Certificates
+                        🎖 Save Awards
                     </button>
                 </div>
                 <?php endif; ?>

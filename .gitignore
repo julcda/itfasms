@@ -44,6 +44,14 @@ portal/node_modules/
 portal/public/build/
 portal/public/hot
 portal/public/storage
+# Student-uploaded profile photos (PII) — keep the folder, not the images
+portal/public/student-photos/*
+!portal/public/student-photos/
+!portal/public/student-photos/.gitkeep
+# LMS-uploaded lesson/assignment media (PII) — keep folder, not contents
+portal/public/lms-uploads/*
+!portal/public/lms-uploads/
+!portal/public/lms-uploads/.gitkeep
 portal/storage/*.key
 portal/storage/app/public/*
 !portal/storage/app/public/.gitkeep
@@ -59,3 +67,30 @@ portal/bootstrap/cache/*
 Thumbs.db
 .DS_Store
 *.log
+
+# Database backups (contain student PII — never commit)
+/storage/backups/*.sql
+/storage/backups/*.sql.gz
+
+# Simulation account credentials (usernames + temp password) — never commit
+/teacher_accounts_sim.csv
+/reset_teacher_passwords_sim.sql
+
+# Marketing / launch graphics
+/ITFA_Student_Portal_Launch*.png
+
+# ---- Live data & one-off operational scripts (student PII) — NEVER commit ----
+# Full live DB dumps
+/thrgd534_grading*.sql
+# Teacher-reported issue screenshots + LRN-correction document
+/errors/
+# One-off data-fix scripts that hard-code live student names / LRNs
+/fix_*.sql
+/cleanup_*.sql
+/reconcile_remaining_sections.sql
+# Local diagnostic probe (not for the repo)
+/portal/public/photo-check.php
+/portal/public/student-photos/_probe*
+# Simulation artifacts
+/cleanup_sim/
+/cleanup_sim

@@ -2,7 +2,7 @@
 @section('title', $lesson->title)
 
 @section('content')
-@php $uploadsUrl = rtrim(config('portal.uploads_url'), '/'); @endphp
+@php $uploadsUrl = rtrim(url(\App\Support\Uploads::url()), '/'); @endphp
 
 <x-breadcrumbs :items="[
     ['label' => 'My Classes', 'url' => route('student.classes.index')],

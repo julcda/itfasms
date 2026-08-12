@@ -25,12 +25,12 @@ class Uploads
 
     public static function base(): string
     {
-        return rtrim((string) config('portal.uploads_path'), '/\\');
+        return rtrim((string) config('portal.lms_uploads_path'), '/\\');
     }
 
     public static function url(?string $path = null): ?string
     {
-        $root = rtrim((string) config('portal.uploads_url'), '/');
+        $root = rtrim((string) config('portal.lms_uploads_url'), '/');
         if ($path === null) {
             return $root;
         }
@@ -66,14 +66,20 @@ class Uploads
         if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
             throw new RuntimeException('Upload storage is not writable on the server.');
         }
+        // Read size/name/mime BEFORE moving — after move() the temp file is gone
+        // and $file->getSize() throws a stat error, which crashed every upload.
+        $size = (int) $file->getSize();
+        $name = (string) $file->getClientOriginalName();
+        $mime = (string) $file->getClientMimeType();
+
         $stored = Str::random(32) . '.' . $ext;
         $file->move($dir, $stored);
 
         return [
             'file_path' => trim($subdir, '/') . '/' . $stored,
-            'file_name' => $file->getClientOriginalName(),
-            'file_size' => (int) $file->getSize(),
-            'mime_type' => (string) $file->getClientMimeType(),
+            'file_name' => $name,
+            'file_size' => $size,
+            'mime_type' => $mime,
         ];
     }
 

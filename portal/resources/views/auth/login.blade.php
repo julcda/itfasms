@@ -6,13 +6,9 @@
     <title>IBN TAIMIYAH FOUNDATION ACADEMY, INC. — Student Portal</title>
     @include('partials.head')
     <style>
-        .brand-glow{filter:drop-shadow(0 0 24px rgba(16,185,129,.45))}
-        .ring-pulse::before{content:'';position:absolute;inset:-10px;border-radius:9999px;border:1.5px solid rgba(224,149,31,.35);animation:ringpulse 3.2s ease-out infinite}
-        .ring-pulse::after{content:'';position:absolute;inset:-10px;border-radius:9999px;border:1.5px solid rgba(16,185,129,.35);animation:ringpulse 3.2s ease-out infinite 1.6s}
-        @keyframes ringpulse{0%{transform:scale(1);opacity:.8}100%{transform:scale(1.5);opacity:0}}
         .title-shine{background:linear-gradient(100deg,#eafff3 15%,#7ff0b4 40%,#eec861 60%,#eafff3 85%);background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shine 6s linear infinite}
         @keyframes shine{to{background-position:200% center}}
-        @media (prefers-reduced-motion: reduce){.title-shine{animation:none}.ring-pulse::before,.ring-pulse::after{animation:none;opacity:0}}
+        @media (prefers-reduced-motion: reduce){.title-shine{animation:none}}
     </style>
 </head>
 <body class="min-h-screen font-sans text-white antialiased overflow-x-hidden" style="background:radial-gradient(80rem 60rem at 20% -10%,#12613a 0%,#0a3a1e 45%,#04200f 100%)">
@@ -26,11 +22,11 @@
     <main class="relative z-10 min-h-screen flex flex-col items-center justify-center px-5 py-10">
         <div class="w-full max-w-lg text-center animate-enter">
 
-            {{-- Logo --}}
+            {{-- Logo — static & self-hosted so it always renders on mobile --}}
             <div class="relative inline-flex mb-6">
-                <div class="ring-pulse relative w-32 h-32 sm:w-40 sm:h-40 rounded-full bg-white/8 ring-1 ring-white/20 backdrop-blur flex items-center justify-center animate-floaty brand-glow">
-                    <img src="{{ rtrim(config('portal.app_base_url'), '/') }}/itfalogo.png" alt="ITFA logo"
-                         class="w-24 h-24 sm:w-32 sm:h-32 object-contain" onerror="this.style.display='none'">
+                <div class="relative w-32 h-32 sm:w-40 sm:h-40 rounded-full bg-white/10 ring-1 ring-white/25 flex items-center justify-center">
+                    <img src="/itfalogo.png" alt="Ibn Taimiyah Foundation Academy logo"
+                         class="w-24 h-24 sm:w-32 sm:h-32 object-contain">
                 </div>
             </div>
 
